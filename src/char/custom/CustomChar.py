@@ -11,6 +11,7 @@ class CustomChar(BaseChar):
     def __init__(self, task, index, char_name=None, confidence=1):
         super().__init__(task, index, char_name, confidence)
         self.manager = CustomCharManager()
+        self.combo_name = ""
         self.combo_str = ""
         self._load_combo()
 
@@ -18,6 +19,7 @@ class CustomChar(BaseChar):
         char_info = self.manager.get_character_info(self.char_name)
         if char_info:
             combo_name = char_info.get("combo_name", "")
+            self.combo_name = combo_name
             self.combo_str = self.manager.get_combo(combo_name)
         else:
             self.logger.warning(f"No custom char info found for {self.char_name}")

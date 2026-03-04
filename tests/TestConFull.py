@@ -58,6 +58,21 @@ class TestConFull(TaskTestCase):
         time.sleep(1)
         self.task.screenshot('test_con_3', show_box=True)
 
+    def test_con_4(self):
+        og.ok.screenshot.ui_dict.clear()
+        # Create a BattleReport object
+        self.set_image('tests/images/04.png')
+        result = self.task.get_all_avatar_vibrate()
+        self.logger.info(f'con_4 {result}')
+        self.assertDictEqual(result, {
+            1: False,
+            2: True,
+            3: False,
+            4: False,
+        })
+        time.sleep(1)
+        self.task.screenshot('test_con_3', show_box=True)
+
 
 if __name__ == '__main__':
     unittest.main()

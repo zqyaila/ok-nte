@@ -30,10 +30,16 @@ class CustomCharManager:
         os.makedirs(FEATURES_DIR, exist_ok=True)
         self.db = {
             "combos": {},
-            "characters": {}
+            "characters": {},
+            "features": {}
         }
         self.load_db()
         self.validate_db()
+        self.validate_db()
+        self._feature_cache = {}
+        self._cache_scr_w = -1
+        self._cache_scr_h = -1
+        self._cache_fids = set()
         self.initialized = True
 
     def load_db(self):
@@ -43,6 +49,7 @@ class CustomCharManager:
                     data = json.load(f)
                     self.db["combos"] = data.get("combos", {})
                     self.db["characters"] = data.get("characters", {})
+                    self.db["features"] = data.get("features", {})
             except Exception as e:
                 logger.error(f"Failed to load custom char DB: {e}")
 
@@ -121,10 +128,14 @@ class CustomCharManager:
             del self.db["characters"][char_name]
             self.save_db()
 
-    def add_feature_to_character(self, char_name, image_mat):
+    def add_feature_to_character(self, char_name, image_mat, width=0, height=0):
         """为角色保存一张截图并关联特征 UUID"""
         fid = f"feat_{uuid.uuid4().hex}"
         self.save_feature_image(fid, image_mat)
+        
+        if "features" not in self.db:
+            self.db["features"] = {}
+        self.db["features"][fid] = {"width": width, "height": height}
         
         if char_name not in self.db["characters"]:
             self.db["characters"][char_name] = {
@@ -154,39 +165,71 @@ class CustomCharManager:
         cv2.imwrite(path, image_mat)
 
     def delete_feature_image(self, feature_id):
-        """删除特征图文件"""
+        """删除特征图文件并移除 DB 内独立的特征分辨率记录"""
+        if "features" in self.db and feature_id in self.db["features"]:
+            del self.db["features"][feature_id]
         path = os.path.join(FEATURES_DIR, f"{feature_id}.png")
         if os.path.exists(path):
             os.remove(path)
 
     def load_feature_image(self, feature_id):
-        """读取特征图"""
+        """读取特征图以及其原始分辨率"""
         path = os.path.join(FEATURES_DIR, f"{feature_id}.png")
         if os.path.exists(path):
-            return cv2.imread(path)
-        return None
+            mat = cv2.imread(path)
+            feat_info = self.db.get("features", {}).get(feature_id, {})
+            w = feat_info.get("width", 0)
+            h = feat_info.get("height", 0)
+            return mat, w, h
+        return None, 0, 0
 
-    def match_feature(self, new_image_mat, threshold=0.8):
+    def match_feature(self, new_image_mat, threshold=0.8, target_char=None):
         """比对新截图与所有数据库内特征图，返回(是/否匹配, 匹配到的角色名, 相似度)"""
+        current_scr_h, current_scr_w = og.executor.frame.shape[:2]
+
+        current_fids = set()
+        for char_data in self.db["characters"].values():
+            current_fids.update(char_data.get("feature_ids", []))
+
+        # 检查是否需要重新构建特征库
+        if (self._cache_scr_w != current_scr_w or 
+            self._cache_scr_h != current_scr_h or 
+            self._cache_fids != current_fids):
+            
+            self._feature_cache.clear()
+            self._cache_scr_w = current_scr_w
+            self._cache_scr_h = current_scr_h
+            self._cache_fids = current_fids
+            
+            for char_name, char_data in self.db["characters"].items():
+                self._feature_cache[char_name] = {}
+                for fid in char_data.get("feature_ids", []):
+                    saved_img, w, h = self.load_feature_image(fid)
+                    if saved_img is not None:
+                        if w != current_scr_w or h != current_scr_h:
+                            scale_x = current_scr_w / w
+                            scale_y = current_scr_h / h
+                            scale = min(scale_x, scale_y)
+                            resized_saved = cv2.resize(saved_img, (round(w * scale), round(h * scale)))
+                        else:
+                            scale = 1
+                            resized_saved = saved_img
+                        logger.debug(f"loaded {char_name} resized width {current_scr_w} / original_width:{w}, scale_x:{scale}")
+                        self._feature_cache[char_name][fid] = resized_saved
+
         best_match_char = None
         best_similarity = 0.0
 
-        for char_name, char_data in self.db["characters"].items():
-            for fid in char_data.get("feature_ids", []):
-                saved_img = self.load_feature_image(fid)
-                if saved_img is not None:
-                    # Resize to ensure matchTemplate works if slightly different
-                    if saved_img.shape != new_image_mat.shape:
-                        resized_saved = cv2.resize(saved_img, (new_image_mat.shape[1], new_image_mat.shape[0]))
-                    else:
-                        resized_saved = saved_img
-                    
-                    # Compute similarity using matchTemplate (Normalized Cross Correlation)
-                    res = cv2.matchTemplate(new_image_mat, resized_saved, cv2.TM_CCOEFF_NORMED)
-                    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-                    if max_val > best_similarity:
-                        best_similarity = max_val
-                        best_match_char = char_name
+        for char_name, cached_features in self._feature_cache.items():
+            if target_char and char_name != target_char:
+                continue
+            for fid, cached_mat in cached_features.items():
+                # Compute similarity using matchTemplate (Normalized Cross Correlation)
+                res = cv2.matchTemplate(new_image_mat, cached_mat, cv2.TM_CCOEFF_NORMED)
+                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+                if max_val > best_similarity:
+                    best_similarity = max_val
+                    best_match_char = char_name
 
         if best_similarity >= threshold:
             return True, best_match_char, best_similarity

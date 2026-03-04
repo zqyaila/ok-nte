@@ -91,14 +91,20 @@ class SlotCard(CardWidget):
 
         self.btn_act.clicked.connect(self.on_action)
         self.current_mat = None
+        self.current_w = 0
+        self.current_h = 0
 
-    def update_result(self, mat, match_name):
+    def update_result(self, mat, w, h, match_name):
         self.current_mat = mat
+        self.current_w = w
+        self.current_h = h
         if mat is not None:
             pixmap = cv_to_pixmap(mat)
             self.image.setImage(pixmap.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            self.image.clear()
+            import numpy as np
+            empty_mat = np.zeros((120, 120, 4), dtype=np.uint8)
+            self.image.setImage(cv_to_pixmap(empty_mat))
 
         if match_name:
             self.status.setText(og.app.tr(f"匹配成功: {match_name}"))
@@ -115,9 +121,9 @@ class SlotCard(CardWidget):
         if dialog.exec():
             char_name, combo_name = dialog.get_data()
             if char_name and self.current_mat is not None:
-                self.manager.add_feature_to_character(char_name, self.current_mat)
+                self.manager.add_feature_to_character(char_name, self.current_mat, width=self.current_w, height=self.current_h)
                 self.manager.add_character(char_name, combo_name)
-                self.update_result(self.current_mat, char_name)
+                self.update_result(self.current_mat, self.current_w, self.current_h, char_name)
 
 
 class TeamScannerTab(CustomTab):
@@ -142,13 +148,18 @@ class TeamScannerTab(CustomTab):
 
         # Cards Layout
         self.cards_layout = QHBoxLayout()
-        self.slots = []
+        self.slots: list[SlotCard] = []
         for i in range(4):
             card = SlotCard(i, self)
             self.slots.append(card)
             self.cards_layout.addWidget(card)
 
         self.vbox.addLayout(self.cards_layout)
+        
+        self.desc = BodyLabel(og.app.tr("未识别也可自动战斗，将使用通用脚本(BaseChar)"))
+        self.desc.setAlignment(Qt.AlignCenter)
+        self.vbox.addWidget(self.desc)
+        
         self.vbox.addStretch(1)
 
         # Connect Signal
@@ -159,6 +170,7 @@ class TeamScannerTab(CustomTab):
         return og.app.tr("扫描队伍")
 
     def on_scan_clicked(self):
+        og.app.start_controller.do_start()
         self.scan_btn.setEnabled(False)
         self.scan_btn.setText(og.app.tr("扫描中..."))
         for card in self.slots:
@@ -175,9 +187,18 @@ class TeamScannerTab(CustomTab):
                 card.status.setText(og.app.tr("未获取到特征"))
             return
 
+        updated_indices = set()
         for res in results:
             idx = res.get("index")
             mat = res.get("mat")
+            w = res.get("width", 0)
+            h = res.get("height", 0)
             match_name = res.get("match")
             if 0 <= idx < 4:
-                self.slots[idx].update_result(mat, match_name)
+                self.slots[idx].update_result(mat, w, h, match_name)
+                updated_indices.add(idx)
+
+        for i in range(4):
+            if i not in updated_indices:
+                self.slots[i].update_result(None, 0, 0, "")
+                self.slots[i].status.setText(og.app.tr("未获取到特征"))

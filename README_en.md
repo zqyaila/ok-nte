@@ -86,7 +86,7 @@ Before starting the automation, please check and confirm the following settings:
     *   **Game Brightness**: Use the **default** in-game brightness.
     *   **UI Scaling**: Use the **default 100%** UI scale.
 *   **Resolution**
-    *   Recommended to use **1600x900** or other common 16:9 resolutions.
+    *   Recommended to use **1920x1080** or other common 16:9 resolutions.
 *   **Keybindings**
     *   Please use the game's **default** keybindings.
 *   **Third-party Software**

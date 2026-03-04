@@ -66,6 +66,7 @@ class BaseChar:
         self.confidence = confidence
         self.logger = Logger.get_logger(self.name)
         self.cycle_start_time = 0.0
+        self.combo_name = "default"
 
     def cycle_start(self):
         self.cycle_start_time = time.time()

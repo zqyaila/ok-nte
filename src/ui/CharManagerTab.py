@@ -171,7 +171,7 @@ class CharManagerTab(CustomTab):
         row, col = 0, 0
         feature_ids = char_info.get("feature_ids", [])
         for fid in feature_ids:
-            img_mat = self.manager.load_feature_image(fid)
+            img_mat, w, h = self.manager.load_feature_image(fid)
             if img_mat is not None:
                 lbl = ImageLabel()
                 lbl.setFixedSize(50, 50)

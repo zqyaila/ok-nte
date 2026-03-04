@@ -420,7 +420,7 @@ class BaseCombatTask(CombatCheck):
         MAX_SIZE = 4  # 固定長度
 
         self.chars = [
-            get_char_by_pos(self, self.get_box_by_name(f'box_char_{i+1}'), i, safe_get(self.chars, i))
+            get_char_by_pos(self, self.get_box_by_name(f'box_char_{i+1}').scale(1.1, 1.1), i, safe_get(self.chars, i))
             if i < count else None
             for i in range(MAX_SIZE)
         ]
@@ -437,7 +437,7 @@ class BaseCombatTask(CombatCheck):
                     char.is_current_char = False
         self.combat_start = time.time()
         if sum(1 for c in self.chars if c is not None) > 0:
-            self.info_set('Chars', self.chars)
+            self.info_set('Chars', [f"{c.char_name}: {c.combo_name}" for c in self.chars if c is not None])
             for c in self.chars:
                 if c:
                     self.log_info(f'loaded chars success {c} {c.confidence}')
