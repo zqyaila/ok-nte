@@ -76,7 +76,7 @@ jobs:
         uses: ok-oldking/pyappify-action@master #使用pyappify打包exe
         with:
           # 使用上一个稳定版本的 Release 来获取已打包的启动器，从而跳过耗时的打包过程
-          use_release: https://api.github.com/repos/BnanZ0/ok-neverness-to-everness/releases/tags/v1.0.18
+          # use_release: https://api.github.com/repos/BnanZ0/ok-neverness-to-everness/releases/tags/v1.0.18
 
       - name: Release
         uses: softprops/action-gh-release@v2

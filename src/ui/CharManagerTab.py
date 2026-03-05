@@ -1,5 +1,4 @@
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (QGridLayout, QHBoxLayout,
                                QVBoxLayout, QWidget)
 
@@ -10,17 +9,8 @@ from qfluentwidgets import (CardWidget, EditableComboBox, FluentIcon,
 from ok import og
 from ok.gui.widget.CustomTab import CustomTab
 from src.char.custom.CustomCharManager import CustomCharManager
+from src.ui.TeamScannerTab import cv_to_pixmap
 
-
-def cv_to_pixmap(cv_img):
-    if cv_img is None or cv_img.size == 0:
-        return QPixmap()
-    if not cv_img.flags['C_CONTIGUOUS']:
-        cv_img = cv_img.copy()
-    height, width, channel = cv_img.shape
-    bytes_per_line = 3 * width
-    qimg = QImage(cv_img.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
-    return QPixmap.fromImage(qimg)
 
 def get_builtin_prefix():
     return f"{og.app.tr('[内置代码]')} "
@@ -175,7 +165,7 @@ class CharManagerTab(CustomTab):
             if img_mat is not None:
                 lbl = ImageLabel()
                 lbl.setFixedSize(50, 50)
-                lbl.setImage(cv_to_pixmap(img_mat).scaled(50, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                lbl.setImage(cv_to_pixmap(img_mat).scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
                 card = CardWidget()
                 card.setFixedSize(80, 110)
                 cv = QVBoxLayout(card)

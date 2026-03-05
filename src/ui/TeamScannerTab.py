@@ -1,7 +1,7 @@
-import cv2
+from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout
 
 from qfluentwidgets import (BodyLabel, CardWidget, ComboBox, FluentIcon,
                             ImageLabel, LineEdit, MessageBoxBase,
@@ -16,12 +16,11 @@ from src.tasks.trigger.AutoCombatTask import AutoCombatTask, scanner_signals
 def cv_to_pixmap(cv_img):
     if cv_img is None or cv_img.size == 0:
         return QPixmap()
-    # 修复 BufferError: underlying buffer is not C-contiguous
     if not cv_img.flags['C_CONTIGUOUS']:
         cv_img = cv_img.copy()
-    height, width, channel = cv_img.shape
+    height, width, _ = cv_img.shape
     bytes_per_line = 3 * width
-    qimg = QImage(cv_img.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
+    qimg = QImage(cv_img.data, width, height, bytes_per_line, QImage.Format.Format_RGB888).rgbSwapped()
     return QPixmap.fromImage(qimg)
 
 
@@ -31,11 +30,11 @@ class NewCharDialog(MessageBoxBase):
         self.manager = manager
 
         self.viewLayout.setSpacing(10)
-        self.viewLayout.addWidget(SubtitleLabel(og.app.tr("记录新特征"), self), alignment=Qt.AlignCenter)
+        self.viewLayout.addWidget(SubtitleLabel(og.app.tr("记录新特征"), self), alignment=Qt.AlignmentFlag.AlignCenter)
 
         img_label = ImageLabel()
-        img_label.setImage(cv_to_pixmap(mat).scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        self.viewLayout.addWidget(img_label, alignment=Qt.AlignCenter)
+        img_label.setImage(cv_to_pixmap(mat).scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.viewLayout.addWidget(img_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.name_input = LineEdit()
         self.name_input.setPlaceholderText(og.app.tr("输入或选择关联的角色名称"))
@@ -84,10 +83,10 @@ class SlotCard(CardWidget):
         self.btn_act = PrimaryPushButton(og.app.tr("未识别，关联新特征"), self)
         self.btn_act.hide()
 
-        self.vbox.addWidget(self.title, alignment=Qt.AlignCenter)
-        self.vbox.addWidget(self.image, alignment=Qt.AlignCenter)
-        self.vbox.addWidget(self.status, alignment=Qt.AlignCenter)
-        self.vbox.addWidget(self.btn_act, alignment=Qt.AlignCenter)
+        self.vbox.addWidget(self.title, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.vbox.addWidget(self.image, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.vbox.addWidget(self.status, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.vbox.addWidget(self.btn_act, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.btn_act.clicked.connect(self.on_action)
         self.current_mat = None
@@ -100,7 +99,7 @@ class SlotCard(CardWidget):
         self.current_h = h
         if mat is not None:
             pixmap = cv_to_pixmap(mat)
-            self.image.setImage(pixmap.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.image.setImage(pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         else:
             import numpy as np
             empty_mat = np.zeros((120, 120, 4), dtype=np.uint8)
