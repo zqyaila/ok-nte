@@ -65,7 +65,7 @@ class NewCharDialog(MessageBoxBase):
 
     def get_data(self):
         char_name = self.name_input.text().strip()
-        combo_name = self.combo_list.currentText().strip()
+        combo_name = self.combo_list.text().strip()
         return char_name, combo_name
 
 

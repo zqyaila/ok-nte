@@ -10,6 +10,9 @@ from ok import og
 from ok.gui.widget.CustomTab import CustomTab
 from src.char.custom.CustomCharManager import CustomCharManager
 from src.ui.TeamScannerTab import cv_to_pixmap
+import zipfile
+import subprocess
+from pathlib import Path
 
 
 def get_builtin_prefix():
@@ -41,9 +44,13 @@ class CharManagerTab(CustomTab):
         self.delete_char_btn = PushButton(FluentIcon.DELETE, og.app.tr("删除角色"), self)
         self.delete_char_btn.clicked.connect(self.on_delete_char)
         self.delete_char_btn.setEnabled(False)
+
+        self.export_btn = PushButton(FluentIcon.SHARE, og.app.tr("导出数据"), self)
+        self.export_btn.clicked.connect(self.on_export_data)
         
         self.left_v_layout.addWidget(self.refresh_btn)
         self.left_v_layout.addWidget(self.delete_char_btn)
+        self.left_v_layout.addWidget(self.export_btn)
         self.left_v_layout.addWidget(self.list_widget)
 
         # Right side: Detail View
@@ -82,10 +89,14 @@ class CharManagerTab(CustomTab):
         self.combo_delete_btn.clicked.connect(self.on_delete_combo)
         self.combo_h_layout.addWidget(self.combo_delete_btn)
 
+        self.combo_test_btn = PushButton(og.app.tr("运行一次测试"))
+        self.combo_test_btn.clicked.connect(self.on_test_combo)
+        self.combo_h_layout.addWidget(self.combo_test_btn)
+
         self.detail_v_layout.addLayout(self.combo_h_layout)
 
         self.combo_text = TextEdit()
-        self.combo_text.setPlaceholderText(og.app.tr("例如: skill, wait(0.5), l_click(3), ultimate"))
+        self.combo_text.setPlaceholderText(og.app.tr("例如: skill,wait(0.5),l_click(3),ultimate"))
         self.combo_text.setMaximumHeight(100)
         self.detail_v_layout.addWidget(self.combo_text)
 
@@ -130,6 +141,29 @@ class CharManagerTab(CustomTab):
             widget = self.feature_grid.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
+
+    def on_export_data(self):
+        downloads_path = Path.home() / "Downloads"
+        base_name = "ok-nte-custom"
+        extension = ".zip"
+        zip_path = downloads_path / f"{base_name}{extension}"
+        
+        counter = 1
+        while zip_path.exists():
+            zip_path = downloads_path / f"{base_name} ({counter}){extension}"
+            counter += 1
+            
+        source_dir = Path.cwd() / "custom_chars"
+        
+        if not source_dir.is_dir():
+            return
+            
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in source_dir.rglob("*"):
+                if file_path.is_file():
+                    zipf.write(file_path, file_path.relative_to(Path.cwd()))
+                    
+        subprocess.run(f'explorer /select,"{zip_path.resolve()}"')
 
     def on_char_selected(self, item):
         if not item:
@@ -205,6 +239,7 @@ class CharManagerTab(CustomTab):
             self.combo_save_btn.setEnabled(True)
             self.combo_unbind_btn.setEnabled(False)
             self.combo_delete_btn.setEnabled(False)
+            self.combo_test_btn.setEnabled(False)
             self.combo_select.setReadOnly(False)
             self.combo_select.setCurrentIndex(-1)
             return
@@ -217,6 +252,7 @@ class CharManagerTab(CustomTab):
             self.combo_save_btn.setEnabled(True)
             self.combo_unbind_btn.setEnabled(self.current_char is not None)
             self.combo_delete_btn.setEnabled(False)  # Built-ins cannot be deleted
+            self.combo_test_btn.setEnabled(False)
             self.combo_select.setReadOnly(True)
             return
             
@@ -233,6 +269,27 @@ class CharManagerTab(CustomTab):
             self.combo_text.setText(combo_content)
         else:
             self.combo_text.clear()
+
+        # Update test button state
+        self.combo_test_btn.setEnabled(True)
+
+    def on_test_combo(self):
+        if not self.combo_text.toPlainText().strip():
+            return
+        og.app.start_controller.handler.post(self._run_combo_test)
+
+    def _run_combo_test(self):
+        og.app.start_controller.do_start()
+        from src.char.custom.CustomChar import CustomChar
+        from src.tasks.trigger.AutoCombatTask import AutoCombatTask
+        task = self.get_task(AutoCombatTask)
+        if not task:
+            return
+            
+        test_char = CustomChar(task=task, index=0, char_name="TEST_CHAR")
+        test_char.combo_str = self.combo_text.toPlainText().strip()
+        test_char._compile_combo()
+        test_char.perform()
 
     def on_save_combo(self):
         combo_name = self.combo_select.currentText().strip()

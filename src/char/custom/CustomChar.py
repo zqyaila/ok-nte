@@ -34,14 +34,13 @@ class CustomChar(BaseChar):
             return
             
         self._execute_parsed_combo()
-        self.switch_next_char()
 
     @classmethod
     def get_command_definitions(cls):
         # 统一在此处配置所有可用指令：指令名、对应内置函数
         return [
-            {"name": "skill", "func": cls.click_skill, "params": "无参数", "doc": "释放共鸣技能", "example": "skill"},
-            {"name": "ultimate", "func": cls.click_ultimate, "params": "无参数", "doc": "释放共鸣解放大招", "example": "ultimate"},
+            {"name": "skill", "func": cls.click_skill, "params": "无参数", "doc": "释放技能", "example": "skill"},
+            {"name": "ultimate", "func": cls.click_ultimate, "params": "无参数", "doc": "释放终结技", "example": "ultimate"},
             {"name": "l_click", "func": cls.smart_left_click, "params": "持续时间(s)，选填", "doc": "鼠标左键。带参数则连点鼠标左键指定秒数，无参数为单次点按", "example": "l_click, l_click(3)"},
             {"name": "r_click", "func": cls.smart_right_click, "params": "持续时间(s)，选填", "doc": "鼠标右键。带参数则连点鼠标右键指定秒数，无参数为单次点按", "example": "r_click, r_click(2)"},
             {"name": "l_hold", "func": cls.heavy_attack, "params": "持续时间(s)，选填", "doc": "按住鼠标左键。带参数则指定秒数", "example": "l_hold, l_hold(2)"},

@@ -211,7 +211,7 @@ class BaseChar:
         self.task.screenshot('click_skill too long, breaking')
 
     def click_skill(self, post_sleep=0, has_animation=False, send_click=True, animation_min_duration=0, time_out=0):
-        """尝试点击并释放共鸣技能。
+        """尝试释放技能。
 
         Args:
             post_sleep (float, optional): 释放技能后的休眠时间。默认为 0。
@@ -324,7 +324,7 @@ class BaseChar:
         self._skill_available = False
 
     def click_ultimate(self, send_click=False, wait_if_cd_ready=0.1):
-        """尝试点击并释放共鸣解放。
+        """尝试释放终结技。
 
         Args:
             send_click (bool, optional): 进入动画后是否发送普通点击。默认为 False。
