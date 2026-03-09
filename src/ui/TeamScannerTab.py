@@ -25,32 +25,44 @@ def cv_to_pixmap(cv_img):
 
 
 class NewCharDialog(MessageBoxBase):
+    tr_title = None
+    tr_name_ph = None
+    tr_combo_ph = None
+    tr_list_ph = None
+
+    @classmethod
+    def init_translations(cls):
+        cls.tr_title = og.app.tr("记录新特征")
+        cls.tr_name_ph = og.app.tr("输入或选择关联的角色名称")
+        cls.tr_combo_ph = og.app.tr("或从已有角色中选择...")
+        cls.tr_list_ph = og.app.tr("选择绑定的出招表 (可选)")
+
     def __init__(self, mat, manager: CustomCharManager, parent=None):
         super().__init__(parent)
         self.manager = manager
 
         self.viewLayout.setSpacing(10)
-        self.viewLayout.addWidget(SubtitleLabel(og.app.tr("记录新特征"), self), alignment=Qt.AlignmentFlag.AlignCenter)
+        self.viewLayout.addWidget(SubtitleLabel(self.tr_title, self), alignment=Qt.AlignmentFlag.AlignCenter)
 
         img_label = ImageLabel()
         img_label.setImage(cv_to_pixmap(mat).scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         self.viewLayout.addWidget(img_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.name_input = LineEdit()
-        self.name_input.setPlaceholderText(og.app.tr("输入或选择关联的角色名称"))
+        self.name_input.setPlaceholderText(self.tr_name_ph)
         self.viewLayout.addWidget(self.name_input)
         
         # 提示现有的角色列表
         self.existing_chars = list(self.manager.get_all_characters().keys())
         # To do a simple dropdown for existing, combining ComboBox
         self.char_combo = ComboBox()
-        self.char_combo.setPlaceholderText(og.app.tr("或从已有角色中选择..."))
+        self.char_combo.setPlaceholderText(self.tr_combo_ph)
         self.char_combo.addItems([""] + self.existing_chars)
         self.char_combo.currentTextChanged.connect(self._on_char_select)
         self.viewLayout.addWidget(self.char_combo)
 
         self.combo_list = ComboBox()
-        self.combo_list.setPlaceholderText(og.app.tr("选择绑定的出招表 (可选)"))
+        self.combo_list.setPlaceholderText(self.tr_list_ph)
         self.combo_list.addItems([""] + self.manager.get_all_combos())
         self.viewLayout.addWidget(self.combo_list)
 
@@ -75,12 +87,21 @@ class SlotCard(CardWidget):
         self.index = index
         self.manager = CustomCharManager()
 
+        # Define translations as attributes
+        self.tr_match_success = og.app.tr("匹配成功: {}")
+        self.tr_unrecognized = og.app.tr("未能识别该特征")
+        self.tr_no_image = og.app.tr("无画面")
+        self.tr_dlg_title = og.app.tr("记录新特征")
+        self.tr_slot_title = og.app.tr("{} 号位")
+        self.tr_scan_prompt = og.app.tr("点击上方按钮扫描...")
+        self.tr_action_btn = og.app.tr("未识别，关联新特征")
+
         self.vbox = QVBoxLayout(self)
-        self.title = SubtitleLabel(og.app.tr(f"号位 {index + 1}"))
+        self.title = SubtitleLabel(self.tr_slot_title.format(index + 1))
         self.image = ImageLabel()
         self.image.setFixedSize(120, 120)
-        self.status = BodyLabel(og.app.tr("点击上方按钮扫描..."))
-        self.btn_act = PrimaryPushButton(og.app.tr("未识别，关联新特征"), self)
+        self.status = BodyLabel(self.tr_scan_prompt)
+        self.btn_act = PrimaryPushButton(self.tr_action_btn, self)
         self.btn_act.hide()
 
         self.vbox.addWidget(self.title, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -106,13 +127,13 @@ class SlotCard(CardWidget):
             self.image.setImage(cv_to_pixmap(empty_mat))
 
         if match_name:
-            self.status.setText(og.app.tr(f"匹配成功: {match_name}"))
+            self.status.setText(self.tr_match_success.format(match_name))
             self.btn_act.hide()
         elif mat is not None:
-            self.status.setText(og.app.tr("未能识别该特征"))
+            self.status.setText(self.tr_unrecognized)
             self.btn_act.show()
         else:
-            self.status.setText(og.app.tr("无画面"))
+            self.status.setText(self.tr_no_image)
             self.btn_act.hide()
 
     def on_action(self):
@@ -129,6 +150,14 @@ class TeamScannerTab(CustomTab):
 
     def __init__(self):
         super().__init__()
+        NewCharDialog.init_translations()
+        
+        self.tr_scan_btn = og.app.tr("扫描当前队伍屏幕槽位")
+        self.tr_scanning = og.app.tr("扫描中...")
+        self.tr_analyzing = og.app.tr("正在分析...")
+        self.tr_no_feature = og.app.tr("未获取到特征")
+        self.tr_name = og.app.tr("扫描队伍")
+        
         self.icon = FluentIcon.CAMERA
         self.logger.info("Init TeamScannerTab")
         
@@ -138,7 +167,7 @@ class TeamScannerTab(CustomTab):
 
         # Header
         self.header = SubtitleLabel(og.app.tr("队伍角色扫描"))
-        self.scan_btn = PrimaryPushButton(FluentIcon.SYNC, og.app.tr("扫描当前队伍屏幕槽位"))
+        self.scan_btn = PrimaryPushButton(FluentIcon.SYNC, self.tr_scan_btn)
         self.scan_btn.setFixedWidth(250)
         self.scan_btn.clicked.connect(self.on_scan_clicked)
 
@@ -166,7 +195,7 @@ class TeamScannerTab(CustomTab):
 
     @property
     def name(self):
-        return og.app.tr("扫描队伍")
+        return self.tr_name
 
     def on_scan_clicked(self):
         og.app.start_controller.handler.post(self.scan_team)
@@ -174,19 +203,19 @@ class TeamScannerTab(CustomTab):
     def scan_team(self):
         og.app.start_controller.do_start()
         self.scan_btn.setEnabled(False)
-        self.scan_btn.setText(og.app.tr("扫描中..."))
+        self.scan_btn.setText(self.tr_scanning)
         for card in self.slots:
-            card.status.setText(og.app.tr("正在分析..."))
+            card.status.setText(self.tr_analyzing)
             card.btn_act.hide()
         self.get_task(AutoCombatTask).scan_team()
 
     def on_scan_done(self, results):
         self.scan_btn.setEnabled(True)
-        self.scan_btn.setText(og.app.tr("扫描当前队伍屏幕槽位"))
+        self.scan_btn.setText(self.tr_scan_btn)
 
         if not results:
             for card in self.slots:
-                card.status.setText(og.app.tr("未获取到特征"))
+                card.status.setText(self.tr_no_feature)
             return
 
         updated_indices = set()
@@ -203,4 +232,4 @@ class TeamScannerTab(CustomTab):
         for i in range(4):
             if i not in updated_indices:
                 self.slots[i].update_result(None, 0, 0, "")
-                self.slots[i].status.setText(og.app.tr("未获取到特征"))
+                self.slots[i].status.setText(self.tr_no_feature)

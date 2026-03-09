@@ -22,6 +22,20 @@ class CharManagerTab(CustomTab):
 
     def __init__(self):
         super().__init__()
+        get_builtin_prefix()
+        self.tr_save_success = og.app.tr('保存成功')
+        self.tr_combo_msg = og.app.tr('出招表: {}')
+        self.tr_del_success = og.app.tr('删除成功')
+        self.tr_del_char_msg = og.app.tr('已成功删除角色: {} 以及关联的特征图')
+        self.tr_unbind_success = og.app.tr('解除绑定')
+        self.tr_unbind_msg = og.app.tr('已解除 {} 的出招表绑定')
+        
+        self.tr_name = og.app.tr('角色管理')
+        self.tr_choose_char = og.app.tr('👈 请在左侧选择一个角色以管理特征和出招表')
+        self.tr_delete = og.app.tr('删除')
+        self.tr_unbound_text = og.app.tr('当前未绑定任何出招表。\n遇到此角色将默认使用基础通用脚本(BaseChar)。')
+        self.tr_builtin_text = og.app.tr('此为内建 Python 脚本，不可在此修改。\n请在对应的源文件中直接修改代码。')
+        
         self.icon = FluentIcon.PEOPLE
         self.manager = CustomCharManager()
 
@@ -58,7 +72,7 @@ class CharManagerTab(CustomTab):
         self.detail_v_layout = QVBoxLayout(self.detail_widget)
         self.detail_v_layout.setContentsMargins(20, 20, 20, 20)
 
-        self.char_title = TitleLabel(og.app.tr("👈 请在左侧选择一个角色以管理特征和出招表"))
+        self.char_title = TitleLabel(self.tr_choose_char)
         self.detail_v_layout.addWidget(self.char_title)
 
         # === 特征图区 ===
@@ -75,30 +89,35 @@ class CharManagerTab(CustomTab):
         self.combo_select = EditableComboBox()
         self.combo_select.setPlaceholderText(og.app.tr("选择或输入出招表名 (按下回车即可创建)"))
         self.combo_select.currentTextChanged.connect(self.on_combo_changed)
-        self.combo_h_layout.addWidget(self.combo_select)
+        self.combo_h_layout.addWidget(self.combo_select, 1)
 
-        self.combo_save_btn = PrimaryPushButton(og.app.tr("保存出招表"))
-        self.combo_save_btn.clicked.connect(self.on_save_combo)
-        self.combo_h_layout.addWidget(self.combo_save_btn)
-
-        self.combo_unbind_btn = PushButton(og.app.tr("解除绑定"))
+        self.combo_unbind_btn = PushButton(FluentIcon.LINK, og.app.tr("解除绑定"))
         self.combo_unbind_btn.clicked.connect(self.on_unbind_combo)
         self.combo_h_layout.addWidget(self.combo_unbind_btn)
 
-        self.combo_delete_btn = PushButton(og.app.tr("删除出招表"))
+        self.combo_delete_btn = PushButton(FluentIcon.DELETE, og.app.tr("删除"))
         self.combo_delete_btn.clicked.connect(self.on_delete_combo)
         self.combo_h_layout.addWidget(self.combo_delete_btn)
-
-        self.combo_test_btn = PushButton(og.app.tr("运行一次测试"))
-        self.combo_test_btn.clicked.connect(self.on_test_combo)
-        self.combo_h_layout.addWidget(self.combo_test_btn)
 
         self.detail_v_layout.addLayout(self.combo_h_layout)
 
         self.combo_text = TextEdit()
-        self.combo_text.setPlaceholderText(og.app.tr("例如: skill,wait(0.5),l_click(3),ultimate"))
+        self.combo_text.setPlaceholderText("skill,wait(0.5),l_click(3),ultimate")
         self.combo_text.setMaximumHeight(100)
         self.detail_v_layout.addWidget(self.combo_text)
+
+        self.combo_actions_layout = QHBoxLayout()
+        self.combo_actions_layout.addStretch(1)
+
+        self.combo_test_btn = PushButton(FluentIcon.PLAY_SOLID, og.app.tr("运行一次测试"))
+        self.combo_test_btn.clicked.connect(self.on_test_combo)
+        self.combo_actions_layout.addWidget(self.combo_test_btn)
+
+        self.combo_save_btn = PrimaryPushButton(FluentIcon.SAVE, og.app.tr("保存出招表"))
+        self.combo_save_btn.clicked.connect(self.on_save_combo)
+        self.combo_actions_layout.addWidget(self.combo_save_btn)
+
+        self.detail_v_layout.addLayout(self.combo_actions_layout)
 
         self.detail_v_layout.addWidget(SubtitleLabel(og.app.tr("可用指令")))
         
@@ -115,7 +134,7 @@ class CharManagerTab(CustomTab):
 
     @property
     def name(self):
-        return og.app.tr("角色管理")
+        return self.tr_name
 
     def refresh_list(self):
         self.current_char = None
@@ -136,7 +155,7 @@ class CharManagerTab(CustomTab):
         self.on_combo_changed("")
 
         self.delete_char_btn.setEnabled(False)
-        self.char_title.setText(og.app.tr("👈 请在左侧选择一个角色以管理特征和出招表"))
+        self.char_title.setText(self.tr_choose_char)
         for i in reversed(range(self.feature_grid.count())):
             widget = self.feature_grid.itemAt(i).widget()
             if widget:
@@ -205,7 +224,7 @@ class CharManagerTab(CustomTab):
                 cv.setContentsMargins(5, 5, 5, 5)
                 cv.setSpacing(2)
                 cv.addWidget(lbl, alignment=Qt.AlignCenter)
-                del_btn = PushButton(og.app.tr("删除"), card)
+                del_btn = PushButton(self.tr_delete, card)
                 
                 # Capture current fid in closure correctly
                 def make_deleter(captured_fid):
@@ -233,7 +252,7 @@ class CharManagerTab(CustomTab):
 
     def on_combo_changed(self, text):
         if not text:
-            self.combo_text.setText("当前未绑定任何出招表。\n遇到此角色将默认使用基础通用脚本(BaseChar)。")
+            self.combo_text.setText(self.tr_unbound_text)
             self.combo_text.setReadOnly(True)
             self.combo_text.setEnabled(False)
             self.combo_save_btn.setEnabled(True)
@@ -246,10 +265,10 @@ class CharManagerTab(CustomTab):
 
         is_builtin = text.startswith(get_builtin_prefix())
         if is_builtin:
-            self.combo_text.setText("此为内建 Python 脚本，不可在此修改。\n请在对应的源文件中直接修改代码。")
+            self.combo_text.setText(self.tr_builtin_text)
             self.combo_text.setReadOnly(True)
             self.combo_text.setEnabled(False)
-            self.combo_save_btn.setEnabled(True)
+            self.combo_save_btn.setEnabled(self.current_char is not None)
             self.combo_unbind_btn.setEnabled(self.current_char is not None)
             self.combo_delete_btn.setEnabled(False)  # Built-ins cannot be deleted
             self.combo_test_btn.setEnabled(False)
@@ -298,16 +317,6 @@ class CharManagerTab(CustomTab):
         is_builtin = combo_name.startswith(get_builtin_prefix())
         
         if is_builtin and not self.current_char:
-            # Cannot create a new builtin combo from the UI, so it ignores
-            InfoBar.error(
-                title=og.app.tr('保存失败'),
-                content=og.app.tr('内建脚本不能在这里直接创建！'),
-                orient=Qt.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=2000,
-                parent=self.window()
-            )
             return
 
         if combo_name:
@@ -325,9 +334,9 @@ class CharManagerTab(CustomTab):
             self.combo_select.blockSignals(False)
             
             InfoBar.success(
-                title=og.app.tr('保存成功'),
-                content=og.app.tr(f'已成功保存并关联出招表: {combo_name}'),
-                orient=Qt.Horizontal,
+                title=self.tr_save_success,
+                content=self.tr_combo_msg.format(combo_name),
+                orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=2000,
@@ -347,9 +356,9 @@ class CharManagerTab(CustomTab):
         self.refresh_list()
         
         InfoBar.success(
-            title=og.app.tr('删除成功'),
-            content=og.app.tr(f'已成功删除角色: {char_to_delete} 以及关联的特征图'),
-            orient=Qt.Horizontal,
+            title=self.tr_del_success,
+            content=self.tr_del_char_msg.format(char_to_delete),
+            orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=2000,
@@ -370,9 +379,9 @@ class CharManagerTab(CustomTab):
                 break
                 
         InfoBar.success(
-            title=og.app.tr('解除绑定'),
-            content=og.app.tr(f'已解除 {self.current_char} 的出招表绑定'),
-            orient=Qt.Horizontal,
+            title=self.tr_unbind_success,
+            content=self.tr_unbind_msg.format(self.current_char),
+            orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=2000,
@@ -409,9 +418,9 @@ class CharManagerTab(CustomTab):
             self.on_combo_changed("")
             
         InfoBar.success(
-            title=og.app.tr('删除成功'),
-            content=og.app.tr(f'已成功删除出招表: {combo_name}'),
-            orient=Qt.Horizontal,
+            title=self.tr_del_success,
+            content=self.tr_combo_msg.format(combo_name),
+            orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=2000,
