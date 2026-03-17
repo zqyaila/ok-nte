@@ -23,15 +23,14 @@ class AutoCombatTask(BaseCombatTask, TriggerTask):
         super().__init__(*args, **kwargs)
         self.default_config = {'_enabled': True}
         self.trigger_interval = 0.1
-        self.name = "Auto Combat"
-        self.description = "Enable auto combat in Abyss, Game World etc"
+        self.name = "自动战斗"
         self.icon = FluentIcon.CALORIES
         self.last_is_click = False
         self.default_config.update({
-            'Auto Target': True,
+            '自动目标': True,
         })
         self.config_description = {
-            'Auto Target': 'Turn off to enable auto combat only when manually target enemy using middle click',
+            '自动目标': '关闭以仅在手动使用中键选择敌人时启用自动战斗',
         }
         self.op_index = 0
         self.origin_func = {}

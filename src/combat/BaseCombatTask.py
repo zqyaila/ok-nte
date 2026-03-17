@@ -49,13 +49,32 @@ class BaseCombatTask(CombatCheck):
             **kwargs: 传递给父类的关键字参数。
         """
         super().__init__(*args, **kwargs)
-        self.chars: list[BaseChar | None] = [None, None, None, None]  # 角色列表
+        self.chars: list[BaseChar] = []
         self.mouse_pos = None  # 当前鼠标位置
         self.combat_start = 0  # 战斗开始时间戳
 
         self.add_text_fix({'Ｅ': 'e'})
         self.use_ultimate = True
         self.vibrate_chars_index: list[int] = []
+
+    @property
+    def team_size(self):
+        """获取当前队伍人数。
+
+        Returns:
+            int: 当前队伍中的角色数量。
+        """
+        return len(self.chars)
+    
+    def get_next_char_index(self):
+        """获取下一个角色的索引。
+
+        Returns:
+            int: 下一个角色的索引。
+        """
+        current_index = self.get_current_char().index
+        next_index = (current_index + 1) % len(self.chars)
+        return next_index
 
     def add_freeze_duration(self, start, duration=-1.0, freeze_time=0.1):
         """添加冻结持续时间。用于精确计算技能冷却等。
@@ -192,10 +211,13 @@ class BaseCombatTask(CombatCheck):
         self.wait_in_team_and_world(time_out=10, raise_if_not_found=False)
 
     def _decide_switch_to(self, current_char: 'BaseChar', free_intro=False):
-        max_priority = Priority.MIN
-        switch_to = current_char
         has_intro = free_intro or current_char.is_cycle_full()
-        switch_order: list['BaseChar'] = []
+        switch_to = current_char
+        max_priority = Priority.MIN
+
+        vibrate_set = set(self.vibrate_chars_index) if has_intro and self.vibrate_chars_index else None
+        vibrate_switch_to = None
+        vibrate_priority = Priority.MIN
 
         for char in self.chars:
             if char is None:
@@ -204,7 +226,7 @@ class BaseCombatTask(CombatCheck):
             if char == current_char:
                 priority = Priority.CURRENT_CHAR
             else:
-                priority = char.get_switch_priority(current_char, has_intro)
+                priority = char.get_switch_priority(has_intro)
                 logger.debug(f'switch_next_char priority: {char} {priority}')
 
             if priority > max_priority or (priority == max_priority and char.last_perform < switch_to.last_perform):
@@ -212,14 +234,18 @@ class BaseCombatTask(CombatCheck):
                     logger.debug('switch priority equal, determine by last perform')
                 max_priority = priority
                 switch_to = char
-                switch_order.append(char)
 
-        if has_intro:
-            for char in reversed(switch_order):
-                if char.index in self.vibrate_chars_index:
-                    switch_to = char
-                    break
-                    
+            if vibrate_set and char != current_char and char.index in vibrate_set:
+                if (vibrate_switch_to is None
+                        or priority > vibrate_priority
+                        or (priority == vibrate_priority and char.last_perform < vibrate_switch_to.last_perform)):
+                    vibrate_priority = priority
+                    vibrate_switch_to = char
+
+        # 有协奏时优先在共振角色子集中竞争；若都在切换CD则回退全体竞争结果。
+        if vibrate_switch_to is not None and vibrate_priority > Priority.SWITCH_CD:
+            switch_to = vibrate_switch_to
+
         return switch_to, has_intro
 
     def switch_next_char(self, current_char: 'BaseChar', post_action=None, free_intro=False):
@@ -230,13 +256,31 @@ class BaseCombatTask(CombatCheck):
             post_action (callable, optional): 切换后执行的动作 (回调函数)。默认为 None。
             free_intro (bool, optional): 是否强制认为拥有入场技 (通常在协奏值满时)。默认为 False。
         """
-        current_char.wait_switch_cd()
-        switch_to, has_intro = self._decide_switch_to(current_char, free_intro)
+        if self.team_size <= 1:
+            self.click(interval=0.1)
+            return
 
-        if switch_to == current_char:
+        current_char.wait_switch_cd()
+
+        switch_to_self_count = 0
+        while True:
+            switch_to, has_intro = self._decide_switch_to(current_char, free_intro)
+            if switch_to != current_char:
+                break
+
+            switch_to_self_count += 1
+            if switch_to_self_count > 5:
+                switch_to = safe_get(self.chars, self.get_next_char_index())
+                if switch_to is not None and switch_to != current_char:
+                    logger.warning(f'switch_next_char forced to next char {switch_to} after repeated self selection')
+                    break
+
             logger.warning(f"{current_char} can't find next char to switch to, performing too fast add a normal attack")
             current_char.continues_normal_attack(0.2)
-            return current_char.switch_next_char()
+
+        if switch_to is None or switch_to == current_char:
+            logger.warning(f'{current_char} failed to find a valid switch target')
+            return
 
         switch_to.has_intro = has_intro
         logger.info(f'switch_next_char {current_char} -> {switch_to} has_intro {switch_to.has_intro}')
@@ -245,6 +289,7 @@ class BaseCombatTask(CombatCheck):
         #     self.screenshot(f'switch_next_char_{current_con}')
         
         last_click_time = 0.0
+        last_decide_time = 0.0
         start_time = time.time()
 
         while True:
@@ -252,12 +297,14 @@ class BaseCombatTask(CombatCheck):
             current_time = time.time()
 
             _, current_index, _ = self.in_team()
-            if current_index == current_char.index and not switch_to.has_intro:
+            if current_index == current_char.index and not has_intro and current_time - last_decide_time > 0.12:
+                last_decide_time = current_time
                 new_switch_to, new_has_intro = self._decide_switch_to(current_char, free_intro)
-                if new_has_intro:
+                if new_has_intro and new_switch_to != current_char:
                     switch_to = new_switch_to
                     has_intro = new_has_intro  # 更新外层状态用于后续逻辑
                     switch_to.has_intro = True
+                    logger.info(f'switch_next_char updated target to {switch_to} has_intro {switch_to.has_intro}')
 
             if current_time - last_click_time > 0.1:
                 self.send_key(switch_to.index + 1)
@@ -305,15 +352,15 @@ class BaseCombatTask(CombatCheck):
         logger.info(f'switch_next_char end {(current_char.last_switch_time - start_time):.3f}s')
 
     def get_ultimate_key(self):
-        """获取共鸣解放技能的按键。
+        """获取终结技技能的按键。
 
         Returns:
-            str: 共鸣解放技能的按键字符串。
+            str: 终结技技能的按键字符串。
         """
         return self.key_config['Ultimate Key']
 
     def get_skill_key(self):
-        """获取声骸技能的按键。
+        """获取技能的按键。
 
         Returns:
             str: 声骸技能的按键字符串。
@@ -321,7 +368,7 @@ class BaseCombatTask(CombatCheck):
         return self.key_config['Skill Key']
 
     def has_skill_cd(self):
-        """检查共鸣技能是否在冷却中。
+        """检查技能是否在冷却中。
 
         Returns:
             bool: 如果在冷却中则返回 True, 否则 False。
@@ -329,7 +376,7 @@ class BaseCombatTask(CombatCheck):
         return self.has_cd('skill')
 
     def has_ult_cd(self):
-        """检查共鸣解放技能是否在冷却中。
+        """检查终结技技能是否在冷却中。
 
         Returns:
             bool: 如果在冷却中则返回 True, 否则 False。
@@ -414,15 +461,14 @@ class BaseCombatTask(CombatCheck):
         in_team, current_index, count = self.in_team()
         if not in_team:
             return False
-        # self.log_info('load chars')
-        # self.chars = [None, None, None, None]
 
-        MAX_SIZE = 4  # 固定長度
+        if count > 4:
+            logger.warning(f'char count {count} larger than 4, set to 4')
+            count = 4
 
         self.chars = [
             get_char_by_pos(self, self.get_box_by_name(f'box_char_{i+1}').scale(1.1, 1.1), i, safe_get(self.chars, i))
-            if i < count else None
-            for i in range(MAX_SIZE)
+            for i in range(count)
         ]
 
         healer_count = 0
@@ -436,7 +482,7 @@ class BaseCombatTask(CombatCheck):
                 else:
                     char.is_current_char = False
         self.combat_start = time.time()
-        if sum(1 for c in self.chars if c is not None) > 0:
+        if self.team_size > 0:
             self.info_set('Chars', [f"{c.char_name}: {c.combo_name}" for c in self.chars if c is not None])
             for c in self.chars:
                 if c:
@@ -523,7 +569,7 @@ class BaseCombatTask(CombatCheck):
 
     def check_avatar_vibrate(self, char_index: int) -> bool:
         """
-        (保留的单次检测接口) 检测指定位置(1~4)的角色是否有红蓝锯齿特效
+        检测指定位置(1~4)的角色是否有红蓝锯齿特效
         """
         boxes_coords = self._get_aura_box_coords()
         if char_index not in boxes_coords:

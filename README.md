@@ -146,11 +146,14 @@ All issues and consequences arising from the use of this software are not relate
 
 
 ## ❤️ 赞助与致谢
-| **微信支付** | **支付宝** |
-| :---: | :---: |
-| <img src="https://github.com/user-attachments/assets/39db1471-6e5f-4c4d-a6f0-b06d38cb44cf" width="350px" height="350px" style="object-fit: contain;" /> | <img src="https://github.com/user-attachments/assets/4c566443-af3a-4b73-9530-386e66f6eb23" width="350px" height="350px" style="object-fit: contain;" /> |
+*   喜欢本项目? [点亮小星星⭐](https://github.com/BnanZ0/ok-neverness-to-everness) 或 [赞助开发者](./.github/sponsor.md)!
 
-感谢您的支持！
+### 贡献者
+
+<a href="https://github.com/BnanZ0/ok-neverness-to-everness/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=BnanZ0/ok-neverness-to-everness" width="40" />
+</a>
+
 ### 赞助商 (Sponsors)
 *   **EXE 签名**: Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
 

@@ -38,7 +38,13 @@ class BaseNTETask(BaseTask):
         in_team, _, _ = self.in_team()
         in_world = True
         return in_team and in_world
-
+    
+    def wait_in_team_and_world(self, time_out=10, raise_if_not_found=True, esc=False):
+        success = self.wait_until(self.in_team_and_world, time_out=time_out, raise_if_not_found=raise_if_not_found,
+                                  post_action=lambda: self.back(after_sleep=2) if esc else None)
+        if success:
+            self.sleep(0.1)
+        return success
 
 lower_white = np.array([244, 244, 244], dtype=np.uint8)
 upper_white = np.array([255, 255, 255], dtype=np.uint8)

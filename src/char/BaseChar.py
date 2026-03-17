@@ -292,7 +292,7 @@ class BaseChar:
         return clicked, duration, animation_start > 0
 
     def send_skill_key(self, post_sleep=0, interval=-1, down_time=0.01):
-        """发送共鸣技能按键。
+        """发送技能按键。
 
         Args:
             post_sleep (float, optional): 发送后的休眠时间。默认为 0。
@@ -303,7 +303,7 @@ class BaseChar:
         self.send_key(self.get_skill_key(), interval=interval, down_time=down_time, after_sleep=post_sleep)
 
     def send_ultimate_key(self, after_sleep=0, interval=-1, down_time=0.01):
-        """发送共鸣解放按键。
+        """发送终结技按键。
 
         Args:
             after_sleep (float, optional): 发送后的休眠时间。默认为 0。
@@ -408,46 +408,40 @@ class BaseChar:
         return self.task.time_elapsed_accounting_for_freeze(start, intro_motion_freeze)
 
     def get_ultimate_key(self):
-        """获取共鸣解放按键 (代理到 task.get_ultimate_key)。"""
+        """获取终结技按键 (代理到 task.get_ultimate_key)。"""
         return self.task.get_ultimate_key()
 
     def get_skill_key(self):
-        """获取共鸣技能按键 (代理到 task.get_skill_key)。"""
+        """获取技能按键 (代理到 task.get_skill_key)。"""
         return self.task.get_skill_key()
 
-    def get_switch_priority(self, current_char, has_intro):
+    def get_switch_priority(self, has_intro):
         """获取切换到此角色的优先级。
 
         Args:
-            current_char (BaseChar): 当前场上角色。
             has_intro (bool): 当前场上角色是否拥有入场技 (通常因协奏值满)。
 
         Returns:
             Priority: 优先级数值。
         """
-        priority = self.do_get_switch_priority(current_char, has_intro)
-        if priority < Priority.MAX and time.time() - self.last_switch_time < 0.9 and not has_intro:
-            return Priority.SWITCH_CD  # switch cd
+        priority = self.do_get_switch_priority()
+        if priority < Priority.MAX and self.time_elapsed_accounting_for_freeze(self.last_switch_time) < 0.9 and not has_intro:
+            return Priority.SWITCH_CD
         else:
             return priority
 
-    def do_get_switch_priority(self, current_char, has_intro=False):
+    def do_get_switch_priority(self):
         """计算切换到此角色的基础优先级 (不考虑切换CD)。
 
-        Args:
-            current_char (BaseChar): 当前场上角色。
-            has_intro (bool, optional): 当前场上角色是否拥有入场技。默认为 False。
-            target_low_con (bool, optional): 队伍策略是否倾向于切换到低协奏值角色。默认为 False。
-
         Returns:
-            int: 基础优先级数值。
+            int: 优先级数值。
         """
         priority = self.priority
         if self.count_ultimate_priority() and self.ultimate_available():
             priority += self.count_ultimate_priority()
         if self.count_skill_priority() and self.skill_available():
             priority += self.count_skill_priority()
-        if priority > 0:
+        if priority > self.priority:
             priority += Priority.SKILL_AVAILABLE
         priority += self.count_base_priority()
         return priority
@@ -457,22 +451,18 @@ class BaseChar:
         return 0
 
     def count_ultimate_priority(self):
-        """计算共鸣解放技能对切换优先级的贡献值。"""
+        """计算终结技技能对切换优先级的贡献值。"""
         return 1
 
     def count_skill_priority(self):
-        """计算共鸣技能对切换优先级的贡献值。"""
+        """计算技能对切换优先级的贡献值。"""
         return 10
 
-    def count_forte_priority(self):
-        """计算共鸣回路技能对切换优先级的贡献值。"""
-        return 0
-
     def skill_available(self):
-        """判断共鸣技能是否可用。
+        """判断技能是否可用。
 
         Args:
-            current (float, optional): 可选的, 当前共鸣技能UI白色像素百分比。默认为 None。
+            current (float, optional): 可选的, 当前技能UI白色像素百分比。默认为 None。
             check_ready (bool, optional): 是否检查技能UI是否完全点亮。默认为 False。
             check_cd (bool, optional): 是否严格检查冷却时间。默认为 False。
 
@@ -492,7 +482,7 @@ class BaseChar:
         return self.task.is_cycle_full()
 
     def ultimate_available(self, check_color=True):
-        """判断共鸣解放是否可用。
+        """判断终结技是否可用。
 
         Returns:
             bool: 如果可用则返回 True。
@@ -522,7 +512,7 @@ class BaseChar:
         Args:
             duration (float): 持续时间 (秒)。
             interval (float, optional): 每次攻击的间隔时间。默认为 0.1。
-            click_skill_if_ready_and_return (bool, optional): 如果共鸣技能可用, 是否立即释放并返回。默认为 False。
+            click_skill_if_ready_and_return (bool, optional): 如果技能可用, 是否立即释放并返回。默认为 False。
             until_cycle_full (bool, optional): 是否持续攻击直到协奏值满。默认为 False。
         """
         start = time.time()
@@ -585,12 +575,12 @@ class BaseChar:
         self.logger.debug('heavy attack end')
 
     def current_skill(self):
-        """获取当前共鸣技能UI白色像素百分比。"""
+        """获取当前技能UI白色像素百分比。"""
         return self.task.calculate_color_percentage(text_white_color,
                                                     self.task.get_box_by_name('box_skill'))
 
     def current_ultimate(self):
-        """获取当前共鸣解放UI白色像素百分比。"""
+        """获取当前终结技UI白色像素百分比。"""
         return self.task.calculate_color_percentage(text_white_color, self.task.get_box_by_name('box_ultimate'))
 
     def need_fast_perform(self):
@@ -641,8 +631,15 @@ class BaseChar:
         return False
 
     def switch_other_char(self):
-        next_char = str((self.index + 1) % len(self.task.chars) + 1)
-        from src.task.AutoCombatTask import AutoCombatTask
+        from src.char.Healer import Healer
+        target_index = (self.index + 1) % len(self.task.chars)
+        for char in self.task.chars:
+            if char and isinstance(char, Healer) and char.index != self.index:
+                target_index = char.index
+                break
+        next_char = str(target_index + 1)
+
+        from src.tasks.trigger.AutoCombatTask import AutoCombatTask
         if isinstance(self.task, AutoCombatTask):
             self.logger.debug('AutoCombatTask, skip switch_other_char')
             return

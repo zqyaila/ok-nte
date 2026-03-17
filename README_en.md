@@ -115,17 +115,32 @@ If the solutions above do not resolve your issue, feel free to report it via [**
 
 ## 💬 Community
 
-*   **QQ Users Group**: `1090560071`
-*   **QQ Developers Group**: ``
-*   **QQ Channel**: [Click to join]()
 *   **Discord**: [https://discord.gg/vVyCatEBgA](https://discord.gg/vVyCatEBgA)
 
 ## 🔗 Projects developed using [ok-script](https://github.com/ok-oldking/ok-script):
 
-*   Wuthering Waves: [https://github.com/ok-oldking/ok-wuthering-waves](https://github.com/ok-oldking/ok-wuthering-waves)
-*   Genshin Impact (discontinued, but background story progression is still usable): [https://github.com/ok-oldking/ok-genshin-impact](https://github.com/ok-oldking/ok-genshin-impact)
-*   Girls' Frontline 2: [https://github.com/ok-oldking/ok-gf2](https://github.com/ok-oldking/ok-gf2)
-*   Honkai: Star Rail: [https://github.com/Shasnow/ok-starrailassistant](https://github.com/Shasnow/ok-starrailassistant)
-*   Star-Resonance: [https://github.com/Sanheiii/ok-star-resonance](https://github.com/Sanheiii/ok-star-resonance)
-*   Duet Night Abyss: [https://github.com/BnanZ0/ok-duet-night-abyss](https://github.com/BnanZ0/ok-duet-night-abyss)
-*   Ash Echoes (discontinued): [https://github.com/ok-oldking/ok-baijing](https://github.com/ok-oldking/ok-baijing)
+* Wuthering Waves [https://github.com/ok-oldking/ok-wuthering-waves](https://github.com/ok-oldking/ok-wuthering-waves)
+* End Field [https://github.com/ok-oldking/ok-end-field](https://github.com/ok-oldking/ok-end-field)
+* Genshin Impact (discontinued, but background story progression is still usable) [https://github.com/ok-oldking/ok-genshin-impact](https://github.com/ok-oldking/ok-genshin-impact)
+* Girls' Frontline 2 [https://github.com/ok-oldking/ok-gf2](https://github.com/ok-oldking/ok-gf2)
+* Honkai: Star Rail [https://github.com/Shasnow/ok-starrailassistant](https://github.com/Shasnow/ok-starrailassistant)
+* Star-Resonance [https://github.com/Sanheiii/ok-star-resonance](https://github.com/Sanheiii/ok-star-resonance)
+* Duet Night Abyss [https://github.com/BnanZ0/ok-duet-night-abyss](https://github.com/BnanZ0/ok-duet-night-abyss)
+* Ash Echoes (discontinued) [https://github.com/ok-oldking/ok-baijing](https://github.com/ok-oldking/ok-baijing)
+
+## ❤️ Support & Acknowledgments
+*   Like this project? [Lighten the star⭐](https://github.com/BnanZ0/ok-neverness-to-everness)
+
+### Contributors
+
+<a href="https://github.com/BnanZ0/ok-neverness-to-everness/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=BnanZ0/ok-neverness-to-everness" width="40" />
+</a>
+
+### Sponsors
+*   **EXE Signing**: Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+### Acknowledgments
+*   [ok-oldking/OnnxOCR](https://github.com/ok-oldking/OnnxOCR)
+*   [zhiyiYo/PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
+*   [Toufool/AutoSplit](https://github.com/Toufool/AutoSplit)
