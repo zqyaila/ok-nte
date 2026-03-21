@@ -8,6 +8,7 @@ from unittest.mock import patch
 from src.char.custom.CustomChar import CustomChar
 from src.char.custom.CustomCharManager import CustomCharManager, DB_SCHEMA_VERSION
 
+PREDEFINED_CHARACTER_REF = "builtin:char_zero"
 
 class TestCustomCharCore(unittest.TestCase):
     def setUp(self):
@@ -71,7 +72,7 @@ class TestCustomCharCore(unittest.TestCase):
         }
         self._write_db(bootstrap)
         manager = CustomCharManager()
-        legacy_builtin_label = manager.to_combo_label("builtin:char_zero")
+        legacy_builtin_label = manager.to_combo_label(PREDEFINED_CHARACTER_REF)
 
         legacy = {
             "combos": {},
@@ -89,8 +90,8 @@ class TestCustomCharCore(unittest.TestCase):
         manager = CustomCharManager()
         info = manager.get_character_info("char_builtin")
         self.assertIsNotNone(info)
-        self.assertEqual(info["combo_ref"], "builtin:char_zero")
-        self.assertEqual(info["combo_name"], "builtin:char_zero")
+        self.assertEqual(info["combo_ref"], PREDEFINED_CHARACTER_REF)
+        self.assertEqual(info["combo_name"], PREDEFINED_CHARACTER_REF)
 
     def test_validate_combo_syntax_reports_line_and_column(self):
         is_valid, error = CustomChar.validate_combo_syntax("skill,wait(0.5)")

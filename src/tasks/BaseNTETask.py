@@ -75,12 +75,9 @@ def binarize_bgr_by_brightness(image):
     返回:
     - 经过二值化处理的 BGR 图像 (MatLike)
     """
-    # from hashlib import sha256
-    # h = sha256(image.tobytes()).hexdigest()
     threshold = 200
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     _, binary_gray = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
     binary_bgr = cv2.cvtColor(binary_gray, cv2.COLOR_GRAY2BGR)
-    # cv2.imwrite(f'{h}.png', binary_bgr)
     
     return binary_bgr

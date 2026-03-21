@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: AI Code Review
-        uses: ok-oldking/ai-codereviewer@main
+        uses: ok-oldking/ai-codereviewer@c7e9358c36a241292c681de4d2b6755ee97ccdb6
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

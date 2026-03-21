@@ -13,6 +13,8 @@ from src.tasks.trigger.AutoCombatTask import AutoCombatTask
 from src.ui.CharManagerTab import CharManagerTab
 from src.ui.TeamScannerTab import SlotCard, TeamScannerTab
 
+PREDEFINED_CHARACTER_REF = "builtin:char_zero"
+
 class TestCustomChar(TaskTestCase):
     task_class = AutoCombatTask
     config = config
@@ -213,7 +215,7 @@ class TestCustomChar(TaskTestCase):
         self.assertEqual(tab.slots[2].status.text(), TeamScannerTab.tr_no_feature)
 
     def test_builtin_combo_roundtrip(self):
-        builtin_ref = "builtin:char_zero"
+        builtin_ref = PREDEFINED_CHARACTER_REF
         builtin_label = self.manager.to_combo_label(builtin_ref)
 
         self.assertTrue(self.manager.is_builtin_combo(builtin_ref))
@@ -235,7 +237,7 @@ class TestCustomChar(TaskTestCase):
     def test_migrate_legacy_builtin_combo_name(self):
         import src.char.custom.CustomCharManager as manager_module
 
-        legacy_label = self.manager.to_combo_label("builtin:char_zero")
+        legacy_label = self.manager.to_combo_label(PREDEFINED_CHARACTER_REF)
         with open(manager_module.DB_PATH, "w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -257,13 +259,13 @@ class TestCustomChar(TaskTestCase):
         migrated_manager = CustomCharManager()
         migrated_info = migrated_manager.get_character_info("legacy_char")
         assert migrated_info is not None
-        self.assertEqual(migrated_info["combo_name"], "builtin:char_zero")
+        self.assertEqual(migrated_info["combo_name"], PREDEFINED_CHARACTER_REF)
 
     def test_char_factory_uses_builtin_ref_without_ui_import(self):
         from src.char.CharFactory import _build_char_instance
         from src.char.Zero import Zero
 
-        self.manager.add_character("builtin_char", "builtin:char_zero")
+        self.manager.add_character("builtin_char", PREDEFINED_CHARACTER_REF)
         instance = _build_char_instance(self.task, 0, "builtin_char", 0.95, self.manager)
         self.assertIsInstance(instance, Zero)
 

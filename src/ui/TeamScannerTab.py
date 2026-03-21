@@ -13,21 +13,14 @@ from src.tasks.trigger.AutoCombatTask import AutoCombatTask, scanner_signals
 
 
 class NewCharDialog(MessageBoxBase):
-    tr_title = None
-    tr_name_ph = None
-    tr_combo_ph = None
-    tr_list_ph = None
-
-    @classmethod
-    def init_translations(cls):
-        cls.tr_title = og.app.tr("记录新特征")
-        cls.tr_name_ph = og.app.tr("输入或选择关联的角色名称")
-        cls.tr_combo_ph = og.app.tr("或从已有角色中选择...")
-        cls.tr_list_ph = og.app.tr("选择绑定的出招表 (可选)")
 
     def __init__(self, mat, manager: CustomCharManager, parent=None):
         super().__init__(parent)
         self.manager = manager
+        self.tr_title = og.app.tr("记录新特征")
+        self.tr_name_ph = og.app.tr("输入或选择关联的角色名称")
+        self.tr_combo_ph = og.app.tr("或从已有角色中选择...")
+        self.tr_list_ph = og.app.tr("选择绑定的出招表 (可选)")
 
         self.viewLayout.setSpacing(10)
         self.viewLayout.addWidget(SubtitleLabel(self.tr_title, self), alignment=Qt.AlignmentFlag.AlignCenter)
@@ -39,7 +32,7 @@ class NewCharDialog(MessageBoxBase):
         self.name_input = LineEdit()
         self.name_input.setPlaceholderText(self.tr_name_ph)
         self.viewLayout.addWidget(self.name_input)
-        
+
         # 提示现有的角色列表
         self.existing_chars = list(self.manager.get_all_characters().keys())
         # To do a simple dropdown for existing, combining ComboBox
@@ -86,28 +79,18 @@ class NewCharDialog(MessageBoxBase):
 
 
 class SlotCard(CardWidget):
-    tr_match_success = None
-    tr_unrecognized = None
-    tr_no_image = None
-    tr_dlg_title = None
-    tr_slot_title = None
-    tr_scan_prompt = None
-    tr_action_btn = None
-
-    @classmethod
-    def init_translations(cls):
-        cls.tr_match_success = og.app.tr("匹配成功: {}")
-        cls.tr_unrecognized = og.app.tr("未能识别该特征")
-        cls.tr_no_image = og.app.tr("无画面")
-        cls.tr_dlg_title = og.app.tr("记录新特征")
-        cls.tr_slot_title = og.app.tr("{} 号位")
-        cls.tr_scan_prompt = og.app.tr("点击上方按钮扫描...")
-        cls.tr_action_btn = og.app.tr("未识别，关联新特征")
 
     def __init__(self, index, manager: CustomCharManager, parent=None):
         super().__init__(parent)
         self.index = index
         self.manager = manager
+        self.tr_match_success = og.app.tr("匹配成功: {}")
+        self.tr_unrecognized = og.app.tr("未能识别该特征")
+        self.tr_no_image = og.app.tr("无画面")
+        self.tr_dlg_title = og.app.tr("记录新特征")
+        self.tr_slot_title = og.app.tr("{} 号位")
+        self.tr_scan_prompt = og.app.tr("点击上方按钮扫描...")
+        self.tr_action_btn = og.app.tr("未识别，关联新特征")
 
         self.vbox = QVBoxLayout(self)
         self.title = SubtitleLabel(self.tr_slot_title.format(index + 1))
@@ -158,34 +141,21 @@ class SlotCard(CardWidget):
 
 
 class TeamScannerTab(CustomTab):
-    tr_scan_btn = None
-    tr_scanning = None
-    tr_analyzing = None
-    tr_no_feature = None
-    tr_name_tab = None
-    tr_header = None
-    tr_desc = None
-
-    @classmethod
-    def init_translations(cls):
-        cls.tr_scan_btn = og.app.tr("扫描当前队伍屏幕槽位")
-        cls.tr_scanning = og.app.tr("扫描中...")
-        cls.tr_analyzing = og.app.tr("正在分析...")
-        cls.tr_no_feature = og.app.tr("未获取到特征")
-        cls.tr_name_tab = og.app.tr("扫描队伍")
-        cls.tr_header = og.app.tr("队伍角色扫描")
-        cls.tr_desc = og.app.tr("未识别也可自动战斗，将使用通用脚本(BaseChar)")
 
     def __init__(self, manager: CustomCharManager = None):
         super().__init__()
-        NewCharDialog.init_translations()
-        SlotCard.init_translations()
-        TeamScannerTab.init_translations()
-        
+        self.tr_scan_btn = og.app.tr("扫描当前队伍屏幕槽位")
+        self.tr_scanning = og.app.tr("扫描中...")
+        self.tr_analyzing = og.app.tr("正在分析...")
+        self.tr_no_feature = og.app.tr("未获取到特征")
+        self.tr_name_tab = og.app.tr("扫描队伍")
+        self.tr_header = og.app.tr("队伍角色扫描")
+        self.tr_desc = og.app.tr("未识别也可自动战斗，将使用通用脚本(BaseChar)")
+
         self.manager = manager or CustomCharManager()
         self.icon = FluentIcon.CAMERA
         self.logger.info("Init TeamScannerTab")
-        
+
         self.vbox = QVBoxLayout(self)
         self.vbox.setContentsMargins(20, 20, 20, 20)
         self.vbox.setSpacing(20)
@@ -208,11 +178,11 @@ class TeamScannerTab(CustomTab):
             self.cards_layout.addWidget(card)
 
         self.vbox.addLayout(self.cards_layout)
-        
+
         self.desc = BodyLabel(self.tr_desc)
         self.desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.vbox.addWidget(self.desc)
-        
+
         self.vbox.addStretch(1)
 
         # Connect Signal
@@ -268,12 +238,12 @@ def cv_to_pixmap(cv_img):
     height, width = cv_img.shape[:2]
     channels = cv_img.shape[2] if len(cv_img.shape) > 2 else 1
     bytes_per_line = channels * width
-    
+
     if channels == 3:
         qimg = QImage(cv_img.data, width, height, bytes_per_line, QImage.Format.Format_RGB888).rgbSwapped()
     elif channels == 4:
         qimg = QImage(cv_img.data, width, height, bytes_per_line, QImage.Format.Format_RGBA8888).rgbSwapped()
     else:
         qimg = QImage(cv_img.data, width, height, bytes_per_line, QImage.Format.Format_Grayscale8)
-        
+
     return QPixmap.fromImage(qimg)
