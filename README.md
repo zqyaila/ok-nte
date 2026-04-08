@@ -75,7 +75,8 @@ All issues and consequences arising from the use of this software are not relate
     ```bash
     pip install -r requirements.txt --upgrade
     ```
-    *提示：每次更新代码后，建议重新运行此命令以确保依赖库为最新版本。*
+    *提示：每次更新代码后，建议重新运行此命令以确保依赖库为最新版本。*  
+    *本项目已支持使用 `uv` 进行依赖管理，`requirements.txt` 和 `requirements-dev.txt` 均由 `uv` 生成。*
 4.  **运行程序**：
     ```bash
     # 运行正式版

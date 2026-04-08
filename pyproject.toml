@@ -1,0 +1,20 @@
+[project]
+name = "ok-neverness-to-everness"
+dynamic = ["version"]
+description = "An image-recognition-based automation tool for Neverness To Everness"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ok-script>=1.0.96",
+    "onnxocr-ppocrv5>=0.0.14",
+    "opencc>=1.2.0",
+    "opencv-python>=4.13.0.92",
+    "openvino>=2026.1.0",
+    "pyside6==6.9.1",
+    "scikit-image>=0.26.0",
+]
+
+[dependency-groups]
+dev = [
+    "polib>=1.2.0",
+]
