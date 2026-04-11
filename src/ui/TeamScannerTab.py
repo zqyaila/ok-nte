@@ -59,7 +59,7 @@ class NewCharDialog(MessageBoxBase):
                 self.combo_list.setCurrentIndex(idx)
             else:
                 self.combo_list.setCurrentText(self.manager.to_combo_label(combo_ref))
-        else:
+        elif isinstance(char_info, dict):
             self.combo_list.setCurrentIndex(0)
 
     def get_data(self):

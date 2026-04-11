@@ -319,8 +319,8 @@ class CharManagerTab(CustomTab):
 
         # Reload DB from disk and refresh UI
         self.manager.load_db()
-        self.manager.validate_db()
         self.manager.migrate_db_schema()
+        self.manager.validate_db()
         self.refresh_list()
 
         InfoBar.success(
