@@ -42,6 +42,16 @@ class BaseCombatTask(CombatCheck):
     hot_key_verified = False  # 热键是否已验证
     freeze_durations = []  # 记录冻结/卡肉的持续时间
 
+    element_ring = (
+        Element.WHITE,
+        Element.GREEN,
+        Element.RED,
+        Element.PURPLE,
+        Element.BLUE,
+        Element.YELLOW,
+    )
+    element_ring_index = {element: index for index, element in enumerate(element_ring)}
+
     def __init__(self, *args, **kwargs):
         """初始化战斗任务。
 
@@ -58,6 +68,8 @@ class BaseCombatTask(CombatCheck):
         self.use_ultimate = True
         self.vibrate_chars_index: list[int] = []
         self.chars_slot_mat = [None, None, None, None]
+        self.element_ring_reaction_counts = {}
+        self.clear_element_ring_reactions()
 
     @property
     def team_size(self):
@@ -93,6 +105,71 @@ class BaseCombatTask(CombatCheck):
                 min_time = char.last_switch_time
                 min_index = char.index
         return min_index
+
+    def _get_element_ring_pair(self, element_a: Element, element_b: Element):
+        index_a = self.element_ring_index.get(element_a)
+        index_b = self.element_ring_index.get(element_b)
+        if index_a is None or index_b is None or index_a == index_b:
+            return None
+        ring_size = len(self.element_ring)
+        if (index_a + 1) % ring_size == index_b:
+            return element_a, element_b
+        if (index_b + 1) % ring_size == index_a:
+            return element_b, element_a
+        return None
+
+    def clear_element_ring_reactions(self):
+        self.element_ring_reaction_counts = {
+            (self.element_ring[i], self.element_ring[(i + 1) % len(self.element_ring)]): 0
+            for i in range(len(self.element_ring))
+        }
+
+    def record_element_ring_reaction(self, char_a: "BaseChar", char_b: "BaseChar") -> bool:
+        if char_a is None or char_b is None:
+            return False
+        pair = self._get_element_ring_pair(char_a.element, char_b.element)
+        if pair is None:
+            return False
+        self.element_ring_reaction_counts[pair] = self.element_ring_reaction_counts.get(pair, 0) + 1
+        return True
+
+    def find_element_ring_reaction_target(self, source_char: "BaseChar") -> "BaseChar | None":
+        if source_char is None:
+            return None
+        source_element_index = self.element_ring_index.get(source_char.element)
+        if source_element_index is None:
+            return None
+
+        ring_size = len(self.element_ring)
+        previous_element = self.element_ring[(source_element_index - 1) % ring_size]
+        next_element = self.element_ring[(source_element_index + 1) % ring_size]
+
+        previous_target = None
+        next_target = None
+        for char in self.chars:
+            if char is None or char.index == source_char.index:
+                continue
+            if char.element == previous_element and (
+                previous_target is None or char.last_switch_time < previous_target.last_switch_time
+            ):
+                previous_target = char
+            elif char.element == next_element and (
+                next_target is None or char.last_switch_time < next_target.last_switch_time
+            ):
+                next_target = char
+
+        if previous_target is None:
+            return next_target
+        if next_target is None:
+            return previous_target
+
+        previous_pair = self._get_element_ring_pair(source_char.element, previous_target.element)
+        next_pair = self._get_element_ring_pair(source_char.element, next_target.element)
+        previous_count = self.element_ring_reaction_counts.get(previous_pair, 0)
+        next_count = self.element_ring_reaction_counts.get(next_pair, 0)
+        if previous_count <= next_count:
+            return previous_target
+        return next_target
 
     def add_freeze_duration(self, start, duration=-1.0, freeze_time=0.1):
         """添加冻结持续时间。用于精确计算技能冷却等。
@@ -243,11 +320,12 @@ class BaseCombatTask(CombatCheck):
         if require_intro and not has_intro:
             return switch_to, has_intro
 
-        max_priority = Priority.MIN
+        if has_intro:
+            switch_to = self.find_element_ring_reaction_target(current_char)
+            if switch_to:
+                return switch_to, has_intro
 
-        # vibrate_set = set(self.vibrate_chars_index) if has_intro and self.vibrate_chars_index else None
-        # vibrate_switch_to = None
-        # vibrate_priority = Priority.MIN
+        max_priority = Priority.MIN
 
         for char in self.chars:
             if char is None:
@@ -266,17 +344,6 @@ class BaseCombatTask(CombatCheck):
                     logger.debug("switch priority equal, determine by last perform")
                 max_priority = priority
                 switch_to = char
-
-            # if vibrate_set and char != current_char and char.index in vibrate_set:
-            #     if (vibrate_switch_to is None
-            #             or priority > vibrate_priority
-            #             or (priority == vibrate_priority and char.last_perform < vibrate_switch_to.last_perform)):
-            #         vibrate_priority = priority
-            #         vibrate_switch_to = char
-
-        # 有协奏时优先在共振角色子集中竞争；若都在切换CD则回退全体竞争结果。
-        # if vibrate_switch_to is not None and vibrate_priority > Priority.SWITCH_CD:
-        #     switch_to = vibrate_switch_to
 
         return switch_to, has_intro
 
@@ -386,6 +453,9 @@ class BaseCombatTask(CombatCheck):
                 self.raise_not_in_combat("failed switch chars")
 
             self.next_frame()
+
+        if has_intro:
+            self.record_element_ring_reaction(current_char, switch_to)
 
         if post_action:
             logger.debug(f"post_action {post_action}")
@@ -532,6 +602,7 @@ class BaseCombatTask(CombatCheck):
             count = 4
 
         elements = self.load_chars_element(count)
+        self.clear_element_ring_reactions()
         fixed_team = CustomCharManager().get_fixed_team()
         fixed_slots = fixed_team.get("slots", []) if fixed_team.get("enabled", False) else []
         new_chars = []
