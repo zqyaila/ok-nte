@@ -39,7 +39,11 @@ class DailyTask(BaseNTETask):
         try:
             self.log_info("开始执行日常任务...", notify=True)
 
-            tasks = [("日常子项1", self.daily_1), ("日常子项2", self.daily_2)]
+            # 定义任务列表，格式为 [(任务配置名称, 任务函数)]
+            tasks = [
+                ("日常子项1", self.daily_1), 
+                ("日常子项2", self.daily_2)
+            ]
 
             self._reset_task_status(tasks)
 
