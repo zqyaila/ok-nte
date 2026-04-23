@@ -157,7 +157,9 @@ class SlotCard(CardWidget):
                 )
             )
         else:
-            self.image.setImage(QPixmap())
+            empty_pixmap = QPixmap(120, 120)
+            empty_pixmap.fill(Qt.GlobalColor.transparent)
+            self.image.setImage(empty_pixmap)
 
         if match_name:
             self.status.setText(self.tr_match_success.format(match_name))
@@ -590,6 +592,7 @@ class TeamManagerTab(CustomTab):
 
         if not results:
             for card in self.slots:
+                card.update_result(None, 0, 0, "")
                 card.status.setText(self.tr_no_feature)
             return
 
