@@ -207,18 +207,17 @@ class BaseChar:
         """返回角色类名作为其字符串表示。"""
         return self.__class__.__name__
 
-    def switch_next_char(self, post_action=None, free_intro=False, target_low_con=False):
+    def switch_next_char(self, post_action=None, free_intro=False):
         """切换到下一个角色 (代理到 task.switch_next_char)。
 
         Args:
             post_action (callable, optional): 切换后执行的动作。默认为 None。
             free_intro (bool, optional): 是否强制认为拥有入场技。默认为 False。
-            target_low_con (bool, optional): 是否优先切换到低协奏值角色。默认为 False。
         """
         self.has_intro = False
         self._ultimate_available = self.ultimate_available()
         self.task.switch_next_char(
-            self, post_action=post_action, free_intro=free_intro, target_low_con=target_low_con
+            self, post_action=post_action, free_intro=free_intro
         )
 
     def sleep(self, sec, check_combat=True):

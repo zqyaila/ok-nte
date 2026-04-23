@@ -649,6 +649,7 @@ class CustomCharManager:
                         else None
                     )
                 res = cv2.matchTemplate(new_image_mat, cached_mat, cv2.TM_CCOEFF_NORMED, mask=mask)
+                res[np.isinf(res)] = 0
                 min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
                 if max_val > best_similarity:
                     best_similarity = max_val

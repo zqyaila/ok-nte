@@ -2,15 +2,11 @@ import cv2
 import numpy as np
 from ok import color_range_to_bound
 
-cd_white_color = {
-    "r": (153, 186),  # Red range
-    "g": (158, 192),  # Green range
-    "b": (162, 193),  # Blue range
-}
+from src import text_white_color
 
 
 def isolate_cd_to_black(cv_image):
-    return create_color_mask(cv_image, cd_white_color, invert=True)
+    return create_color_mask(cv_image, text_white_color, invert=True)
 
 
 def binarize_bgr_by_brightness(image, threshold=180):

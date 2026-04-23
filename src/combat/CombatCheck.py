@@ -3,7 +3,8 @@ import time
 from typing import TYPE_CHECKING
 
 import cv2
-from ok import Logger, find_color_rectangles
+import numpy as np
+from ok import Box, Logger, find_color_rectangles, color_range_to_bound
 
 from src.Labels import Labels
 from src.tasks.BaseNTETask import BaseNTETask
@@ -75,33 +76,28 @@ class CombatCheck(BaseNTETask):
         def filter(image):
             return iu.binarize_bgr_by_brightness(image, threshold=180)
 
-        box = self.box_of_screen(0.3582, 0.0215, 0.4508, 0.0569)
+        box = self.box_of_screen(0.3582, 0.0215, 0.4808, 0.0569)
         is_boss = self.find_one(Labels.boss_lv_text, box=box, frame_processor=filter)
         return bool(is_boss)
 
-    def test_ocr_lv(self, boxes):
-        lv_text_boxes = []
-        lv_text_imgs = []
-        width = self.width
-        height = self.height
-        frame = self.frame
-        lv_regex = re.compile(r"lv", flags=re.IGNORECASE)
-        self.ocr(box=boxes[0], frame=frame, frame_processor=iu.binarize_bgr_by_brightness)
-        for box in boxes:
-            box_xr = box.x / width + 0.01
-            box_yr = box.y / height - 0.035
+    def target_enemy(self, wait=True):
+        if not wait:
+            self.middle_click()
+        else:
+            if self.has_target():
+                return True
+            else:
+                logger.info(f'target lost try retarget {self.target_enemy_time_out}')
+                start = time.time()
+                while time.time() - start < self.target_enemy_time_out:
+                    self.middle_click(interval=1)
+                    if self.has_target():
+                        return True
+                    self.next_frame()
 
-            lv_text_box = self.box_of_screen(box_xr, box_yr, width=0.03, height=0.038)
-            lv_text_imgs.append(lv_text_box.crop_frame(frame))
-            lv_text_boxes.append(lv_text_box)
-        img = merge_images_vertically(lv_text_imgs)
-        start = time.perf_counter()
-        texts = self.ocr(match=lv_regex, frame=img, frame_processor=iu.binarize_bgr_by_brightness)
-        end = time.perf_counter()
-        logger.info(f"ocr: {end - start}")
-        if len(texts) > 0:
-            return True
-        self.draw_boxes("search_lv", lv_text_boxes, color="blue")
+    def has_target(self):
+        ret = self.find_diamond_target()[0] is not None
+        return ret
 
     def has_health_bar(self):
         if self._find_red_health_bar() or self._find_boss_health_bar():
@@ -111,10 +107,11 @@ class CombatCheck(BaseNTETask):
     def _find_red_health_bar(self):
         min_height = self.height_of_screen(7 / 2160)
         min_width = self.width_of_screen(100 / 3840)
-        max_height = min_height * 3
+        max_height = min_height * 2
+        max_width = self.width_of_screen(200 / 3840)
 
         boxes = find_color_rectangles(
-            self.frame, enemy_health_color_red, min_width, min_height, max_height=max_height
+            self.frame, enemy_health_color_red, min_width, min_height, max_width, max_height
         )
 
         if len(boxes) > 0:
@@ -159,38 +156,162 @@ class CombatCheck(BaseNTETask):
             if not self.on_combat_check():
                 self.log_info("on_combat_check failed")
                 return self.reset_to_false(reason="on_combat_check failed")
-            if self.is_boss() or self.check_health_bar():
+            if self.is_boss():
                 return self.scene.set_in_combat()
+            if self.has_target():
+                return self.scene.set_in_combat()
+            # else:
+            #     frame = getattr(self, 'cache_frame', None)
+            #     if frame is not None:
+            #         cv2.imwrite(f"cache_frame_{int(time.time())}.png", frame)
             # if self.has_target():
             #     self.last_in_realm_not_combat = 0
             #     return self.scene.set_in_combat()
             if self.combat_end_condition is not None and self.combat_end_condition():
                 return self.reset_to_false(reason="end condition reached")
-            # if self.target_enemy(wait=True):
-            #     logger.debug('retarget enemy succeeded')
-            #     return self.scene.set_in_combat()
+            if self.target_enemy(wait=True):
+                logger.debug('retarget enemy succeeded')
+                return self.scene.set_in_combat()
             # if self.should_check_monthly_card() and self.handle_monthly_card():
             #     return self.scene.set_in_combat()
             logger.error("target_enemy failed, try recheck break out of combat")
             return self.reset_to_false(reason="target enemy failed")
         else:
-            in_combat = self.check_health_bar()
+            from src.tasks.trigger.AutoCombatTask import AutoCombatTask
+            has_target = self.has_target()
+            if not has_target and target:
+                self.log_debug('try target')
+                self.middle_click(after_sleep=0.1)
+            in_combat = has_target or ((self.config.get('自动目标') or not isinstance(self, AutoCombatTask)) and self.check_health_bar())
             if in_combat:
+                if not has_target and not self.target_enemy(wait=True):
+                    return False
                 self.log_info("enter combat")
                 self._in_combat = self.load_chars()
                 return self._in_combat
 
+    def create_rhombus_template(self, size):
+        """
+        版模板生成器：支持奇数(如9x9)的尖顶，也完美支持偶数(如10x10)的平顶
+        """
+        template = np.zeros((size, size), dtype=np.uint8)
+        mask = np.zeros((size, size), dtype=np.uint8)
+        
+        # 浮点数中心点，完美解决偶数尺寸没有绝对中心的问题
+        cy, cx = (size - 1) / 2.0, (size - 1) / 2.0
+        
+        for i in range(size):
+            for j in range(size):
+                # 计算到中心的精确曼哈顿距离
+                dist = abs(i - cy) + abs(j - cx)
+                
+                # 动态划分内核与外框的范围
+                if dist < (size / 2.0) - 1.5:
+                    template[i, j] = 255
+                    mask[i, j] = 255
+                elif dist < (size / 2.0) + 0.5:
+                    template[i, j] = 0
+                    mask[i, j] = 255
+                    
+        
+        return template, mask
+
+
+    def find_diamond_target(self, scales=range(10, 15), threshold=0.9):
+        """
+        在图像中心 50% 范围内寻找黑框白底菱形
+        利用屏幕比例动态收缩范围 + 智能颜色遮罩剔除背景杂讯
+        """
+        ratio = self.height / 1440.0
+        
+        dynamic_scales = set()
+        for base_size in scales:
+            new_size = max(5, int(round(base_size * ratio)))
+            dynamic_scales.add(new_size)
+        dynamic_scales = sorted(list(dynamic_scales))
+
+        self.cache_frame = self.frame
+        box = self.box_of_screen(0.25, 0.25, 0.75, 0.75)
+        roi = box.crop_frame(self.cache_frame)
+
+        # ==========================================
+        # 【核心优化】：智能颜色过滤 + 保留灰度特征
+        # ==========================================
+        # 1. 严格过滤白内核 (建议范围放宽一点点如240-255，防止抗锯齿导致核心不是纯白)
+        color = {
+            "r": (255, 255),
+            "g": (255, 255),
+            "b": (255, 255),
+        }
+        lower_bound, upper_bound = color_range_to_bound(color) # 假设你有这个辅助函数
+        white_mask = cv2.inRange(roi, lower_bound, upper_bound)
+
+        # 2. 【极大提升性能】如果画面里连一点白色都没有，直接判定找不到，跳过所有匹配计算
+        if cv2.countNonZero(white_mask) == 0:
+            return None, None, None
+
+        # 3. 膨胀白色区域（向外扩展一圈）。
+        # 用最大的 scale 作为 kernel 大小，刚好能包裹住白核心外面的那圈“黑外框”
+        # kernel_size = dynamic_scales[-1]
+        # kernel_size = kernel_size if kernel_size % 2 != 0 else kernel_size + 1 # 保证奇数
+        # kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        # valid_areas = cv2.dilate(white_mask, kernel)
+
+        # 4. 提取原灰度图，但把有效区域之外的全部抹成统一的“平庸灰 (128)”
+        roi_gray_original = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY) if len(roi.shape) == 3 else roi
+        filtered_gray = np.full_like(roi_gray_original, 0)
+        
+        # 使用 np.where：只要在有效区域内，保留原图的明暗细节(白核+黑框)；不在区域内，一律填成 128
+        roi_gray = np.where(white_mask == 255, roi_gray_original, filtered_gray)
+        
+        # iu.display_image(roi_gray, name="roi_gray")
+        # ==========================================
+
+        best_match_val = -1.0  
+        best_loc = None
+        best_scale = None
+        
+        for size in dynamic_scales:
+            template, mask = self.create_rhombus_template(size)
+            # iu.display_image(template, name="template")
+            
+            res = cv2.matchTemplate(roi_gray, template, cv2.TM_CCOEFF_NORMED)
+            
+            _, max_val, _, max_loc = cv2.minMaxLoc(res)
+            
+            if max_val > best_match_val:
+                best_match_val = max_val
+                best_loc = max_loc
+                best_scale = size
+
+        if best_match_val >= threshold:
+            center_x = box.x + best_loc[0] + best_scale // 2
+            center_y = box.y + best_loc[1] + best_scale // 2
+            
+            result_box = Box(
+                center_x - best_scale // 2,
+                center_y - best_scale // 2,
+                width=best_scale,
+                height=best_scale,
+                confidence=best_match_val,
+            )
+            self.draw_boxes("target", result_box, color="blue")
+            
+            return (center_x, center_y), best_scale, best_match_val
+        else:
+            return None, None, None
+
 
 enemy_health_color_red = {
-    "r": (215, 255),  # Red range
-    "g": (20, 70),  # Green range
-    "b": (20, 55),  # Blue range
+    "r": (220, 255),
+    "g": (25, 40),
+    "b": (25, 40),
 }
 
 boss_health_color = {
-    "r": (235, 255),  # Red range
-    "g": (50, 95),  # Green range
-    "b": (40, 75),  # Blue range
+    "r": (215, 240),
+    "g": (30, 60),
+    "b": (50, 75),
 }
 
 
