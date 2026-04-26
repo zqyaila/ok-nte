@@ -24,6 +24,10 @@ class FishingTask(BaseNTETask):
     BITE_TIMEOUT = 20
     CONTROL_TIMEOUT = 30
     RESULT_TIMEOUT = 10
+    _GREEN_HSV_LOWER = np.array([50, 150, 160], dtype=np.uint8)
+    _GREEN_HSV_UPPER = np.array([160, 220, 255], dtype=np.uint8)
+    _YELLOW_HSV_LOWER = np.array([20, 60, 195], dtype=np.uint8)
+    _YELLOW_HSV_UPPER = np.array([55, 200, 255], dtype=np.uint8)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -38,6 +42,8 @@ class FishingTask(BaseNTETask):
         )
         self._fishing_started = False
         self._last_bar_log_time = 0.0
+        self._morph_kernel = np.ones((3, 3), dtype=np.uint8)
+        self._bar_active_key = None
 
     def click(self, *args, **kwargs):
         kwargs.setdefault("move", True)
@@ -127,28 +133,33 @@ class FishingTask(BaseNTETask):
     def control_until_finish(self) -> bool:
         deadline = time.time() + self.CONTROL_TIMEOUT
         failed_time = 0
-        while time.time() < deadline:
-            state = self.get_bar_state()
-            if self.is_valid_bar_state(state):
-                self.apply_bar_control(state)
+        try:
+            while time.time() < deadline:
+                state = self.get_bar_state()
+                if self.is_valid_bar_state(state):
+                    self.apply_bar_control(state)
+                else:
+                    self._set_bar_key(None)
 
-            if self.is_fish_bait_exist():
-                if failed_time == 0:
-                    failed_time = time.time()
+                if self.is_fish_bait_exist():
+                    if failed_time == 0:
+                        failed_time = time.time()
+                else:
+                    failed_time = 0
+
+                if failed_time != 0 and time.time() - failed_time > 5:
+                    self.log_error("疑似脱钩或失败")
+                    return False
+
+                if self.is_success_overlay():
+                    return True
+
+                self.next_frame()
             else:
-                failed_time = 0
-
-            if failed_time != 0 and time.time() - failed_time > 5:
-                self.log_error("疑似脱钩或失败")
-                return False
-
-            if self.is_success_overlay():
-                return True
-
-            self.next_frame()
-        else:
-            self.log_error("控条阶段超时")
-        return False
+                self.log_error("控条阶段超时")
+            return False
+        finally:
+            self._set_bar_key(None)
 
     def apply_bar_control(self, state: dict):
         now = time.time()
@@ -156,32 +167,35 @@ class FishingTask(BaseNTETask):
         zone_left = int(state["zone_left"])
         zone_right = int(state["zone_right"])
 
-        zone_center = (zone_left + zone_right) // 2
         zone_width = max(1, zone_right - zone_left)
-        
-        dist_from_center = pointer - zone_center
-        abs_dist = abs(dist_from_center)
-        
+        half_width = zone_width / 2
+        left_distance = pointer - zone_left
+
         deadzone = max(2, int(zone_width * 0.06))
-        
-        if abs_dist <= deadzone:
+
+        if abs(left_distance - half_width) <= deadzone:
+            self._set_bar_key(None)
             if now - getattr(self, "_last_bar_log_time", 0) > 0.5:
-                self.log_info(f"指针已锁定中心: pointer={pointer}, target={zone_center}")
+                self.log_info(
+                    f"指针已锁定中心: pointer={pointer}, left={left_distance:.1f}, target={half_width:.1f}"
+                )
                 self._last_bar_log_time = now
             return
 
-        key = "d" if dist_from_center < 0 else "a"
+        key = "d" if left_distance < half_width else "a"
+        self._set_bar_key(key)
 
-        ratio = abs_dist / (zone_width / 2)
-        
-        base_hold = 0.015
-        
-        hold_ext = (ratio ** 1.2) * 0.15
-        hold = base_hold + hold_ext
-        
-        hold = min(0.20, max(0.01, hold))
+    def _set_bar_key(self, key):
+        if key == self._bar_active_key:
+            return
 
-        self.send_key(key, down_time=hold)
+        if self._bar_active_key is not None:
+            self.send_key_up(self._bar_active_key)
+            self._bar_active_key = None
+
+        if key is not None:
+            self.send_key_down(key)
+            self._bar_active_key = key
 
     def get_bar_state(self):
         return self.detect_fishing_bar_state()
@@ -235,6 +249,7 @@ class FishingTask(BaseNTETask):
             self.close_success_overlay()
 
     def reset_runtime_state(self):
+        self._set_bar_key(None)
         self._fishing_started = False
         self._last_bar_log_time = 0.0
 
@@ -250,20 +265,15 @@ class FishingTask(BaseNTETask):
 
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        green_mask = cv2.inRange(
-            hsv, np.array([50, 150, 160], dtype=np.uint8), np.array([160, 220, 255], dtype=np.uint8)
-        )
-        yellow_mask = cv2.inRange(
-            hsv, np.array([20, 60, 195], dtype=np.uint8), np.array([55, 200, 255], dtype=np.uint8)
-        )
+        green_mask = cv2.inRange(hsv, self._GREEN_HSV_LOWER, self._GREEN_HSV_UPPER)
+        yellow_mask = cv2.inRange(hsv, self._YELLOW_HSV_LOWER, self._YELLOW_HSV_UPPER)
 
         # iu.show_images([green_mask, yellow_mask], names=["green_mask", "yellow_mask"], wait_key=1)
 
-        kernel = np.ones((3, 3), dtype=np.uint8)
-        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel)
-        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel)
-        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_OPEN, kernel)
-        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_CLOSE, kernel)
+        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, self._morph_kernel)
+        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, self._morph_kernel)
+        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_OPEN, self._morph_kernel)
+        yellow_mask = cv2.morphologyEx(yellow_mask, cv2.MORPH_CLOSE, self._morph_kernel)
         # iu.show_images([green_mask, yellow_mask], names=["green_mask", "yellow_mask"])
 
         yellow_contours, _ = cv2.findContours(
@@ -277,28 +287,14 @@ class FishingTask(BaseNTETask):
         else:
             pointer_center = -1
 
-        green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        green_candidates = []
-        for contour in green_contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            if w >= 5 and h >= 5:
-                green_candidates.append((x, y, w, h))
-
-        if not green_candidates:
+        col_has_green = np.any(green_mask > 0, axis=0)
+        green_cols = np.flatnonzero(col_has_green)
+        if green_cols.size == 0:
             return None
 
-        green_candidates.sort(key=lambda item: item[0])
-
-        if len(green_candidates) == 1:
-            zone_x, _, zone_w, _ = green_candidates[0]
-            zone_left = zone_x
-            zone_right = zone_x + zone_w
-        else:
-            min_x = green_candidates[0][0]
-            max_x_w = green_candidates[-1][0] + green_candidates[-1][2]
-            zone_left = min_x
-            zone_right = max_x_w
-            zone_w = zone_right - zone_left
+        zone_left = int(green_cols[0])
+        zone_right = int(green_cols[-1] + 1)
+        zone_w = max(1, zone_right - zone_left)
 
         return {
             "zone_left": zone_left,
