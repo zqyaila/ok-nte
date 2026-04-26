@@ -607,6 +607,7 @@ class BaseCombatTask(CombatCheck):
         if count > 4:
             logger.warning(f"char count {count} larger than 4, set to 4")
             count = 4
+        self.log_info(f"load_chars count {count} current_index {current_index}")
 
         elements = self.load_chars_element(count)
         self.clear_element_ring_reactions()

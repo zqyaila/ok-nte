@@ -366,8 +366,7 @@ class CombatCheck(BaseNTETask):
             )
         return None
 
-
-enemy_health_hsv = iu.HSVRange(np.array([0, 190, 175]), np.array([10, 255, 255]))
+enemy_health_hsv = iu.HSVRange((0, 190, 175), (10, 255, 255))
 
 enemy_health_color_red = {
     "r": (210, 255),
