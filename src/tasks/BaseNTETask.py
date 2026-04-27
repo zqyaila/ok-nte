@@ -1,4 +1,5 @@
 import ctypes
+import inspect
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -40,7 +41,20 @@ class BaseNTETask(BaseTask):
         return self.box_of_screen(0.1543, 0.1021, 0.9070, 0.8458)
 
     def click(self, *args, **kwargs):
-        kwargs.setdefault("move", False)
+        frame = inspect.currentframe()
+        caller_frame = frame.f_back
+        
+        if caller_frame and caller_frame.f_code.co_name == "click_box":
+            grand_frame = caller_frame.f_back
+            if grand_frame and grand_frame.f_code.co_name == "click":
+                if "original_move" in grand_frame.f_locals:
+                    kwargs["move"] = grand_frame.f_locals["original_move"]
+        original_move = kwargs.pop("move", False)
+
+        if args and isinstance(args[0], (Box, list)):
+            return self.click_box(*args, **kwargs)
+
+        kwargs["move"] = original_move
         return super().click(*args, **kwargs)
 
     def get_char_box(self, index: int):
@@ -367,8 +381,7 @@ class BaseNTETask(BaseTask):
                     break
         if travel_btn:
             self.sleep(0.5)
-            x, y = travel_btn.center()
-            self.click(x, y, after_sleep=1, move=True)
+            self.click(travel_btn, after_sleep=1, move=True)
             return True
         return False
 
