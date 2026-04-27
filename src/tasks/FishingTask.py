@@ -23,10 +23,6 @@ class FishingTask(BaseNTETask):
     OPEN_PANEL_TIMEOUT = 5
     BITE_TIMEOUT = 20
     CONTROL_TIMEOUT = 30
-    _GREEN_HSV_LOWER = np.array([50, 150, 160], dtype=np.uint8)
-    _GREEN_HSV_UPPER = np.array([160, 220, 255], dtype=np.uint8)
-    _YELLOW_HSV_LOWER = np.array([20, 60, 195], dtype=np.uint8)
-    _YELLOW_HSV_UPPER = np.array([55, 200, 255], dtype=np.uint8)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -169,12 +165,12 @@ class FishingTask(BaseNTETask):
 
         zone_center = (zone_left + zone_right) // 2
         zone_width = max(1, zone_right - zone_left)
-        
-        error = pointer - zone_center 
+
+        error = pointer - zone_center
         abs_error = abs(error)
-        
+
         deadzone = max(2, int(zone_width * 0.06))
-        
+
         if abs_error <= deadzone:
             self._set_bar_key(None)
             if now - self._last_bar_log_time > 1:
@@ -263,10 +259,12 @@ class FishingTask(BaseNTETask):
         if image is None or image.size == 0:
             return None
 
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-        green_mask = cv2.inRange(hsv, self._GREEN_HSV_LOWER, self._GREEN_HSV_UPPER)
-        yellow_mask = cv2.inRange(hsv, self._YELLOW_HSV_LOWER, self._YELLOW_HSV_UPPER)
+        green_mask = iu.filter_by_hsv(
+            image, iu.HSVRange((50, 150, 160), (160, 220, 255)), binary=True
+        )
+        yellow_mask = iu.filter_by_hsv(
+            image, iu.HSVRange((20, 60, 195), (55, 200, 255)), binary=True
+        )
 
         # iu.show_images([green_mask, yellow_mask], names=["green_mask", "yellow_mask"], wait_key=1)
 
