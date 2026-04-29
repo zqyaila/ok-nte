@@ -1,4 +1,6 @@
 from ok import Logger, TriggerTask
+
+from src import text_white_color
 from src.Labels import Labels
 from src.tasks.BaseNTETask import BaseNTETask
 from src.utils import game_filters as gf
@@ -32,10 +34,10 @@ class SkipDialogTask(TriggerTask, BaseNTETask):
         if self.config.get("跳过剧情") and self.in_story():
             if self.check_skip():
                 return
-            self.check_dialog_click()
             if self.check_options():
                 return
-            
+            self.check_dialog_click()
+
         if self.config.get("自动消息"):
             if self.skip_message():
                 return
@@ -44,14 +46,27 @@ class SkipDialogTask(TriggerTask, BaseNTETask):
         return self.find_one(Labels.auto_play) or self.find_skip() or self.find_dialog_history()
 
     def check_options(self):
-        if self.find_one(
-            Labels.message_dialog, box=self.box_of_screen(0.6887, 0.6410, 0.7121, 0.7910)
+        if boxes := self.find_feature(
+            Labels.dialog_history, box=self.box_of_screen(0.6887, 0.5160, 0.7121, 0.7764),
+            threshold=0.6
         ):
+            for i, box in enumerate(boxes):
+                new_box = box.scale(2)
+                new_box.name += f"_color_{i}"
+                color_percentage = self.calculate_color_percentage(option_pink_color, new_box)
+                # logger.info(f"option {i} color_percentage: {color_percentage}")
+                if color_percentage > 0.3:
+                    break
+            else:
+                return True
             self.send_key("f", after_sleep=0.1)
             return True
+        return False
 
     def find_dialog_history(self):
-        return self.find_one(Labels.dialog_history, threshold=0.8, box=self.default_box.dialog_icon_box)
+        return self.find_one(
+            Labels.dialog_history, threshold=0.8, box=self.default_box.dialog_icon_box
+        )
 
     def check_dialog_click(self):
         if self.find_dialog_history():
@@ -90,6 +105,10 @@ class SkipDialogTask(TriggerTask, BaseNTETask):
     def skip_confirm(self):
         if skip_button := self.find_one(Labels.skip_quest_confirm, threshold=0.8):
             # sleep 0.2 to stable click skip button
+            self.wait_until(
+                lambda: self.calculate_color_percentage(skip_confirm_color, skip_button) > 0.4,
+                time_out=6,
+            )
             self.sleep(0.2)
             self.click(0.4508, 0.5194, down_time=0.01, after_sleep=0.4)
             self.click(skip_button, down_time=0.01, after_sleep=0.1)
@@ -117,3 +136,16 @@ class SkipDialogTask(TriggerTask, BaseNTETask):
     def check_skip(self):
         if self.try_click_skip():
             return self.wait_until(self.skip_confirm, time_out=5, raise_if_not_found=False)
+
+
+skip_confirm_color = {
+    "r": (208, 217),
+    "g": (208, 217),
+    "b": (208, 217),
+}
+
+option_pink_color = {
+    "r": (235, 250),
+    "g": (75, 85),
+    "b": (140, 145),
+}
