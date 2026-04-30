@@ -451,7 +451,7 @@ class FishingTask(BaseNTETask):
         检测成功文本是否存在
         """
         box = self.box_of_screen(*self.SUCCESS_TEXT_BOX, name="success_text")
-        return self.calculate_color_percentage(text_white_color, box) > 0.3
+        return self.calculate_color_percentage(text_white_color, box) > 0.2
 
     def is_fish_bait_exist(self):
         """
