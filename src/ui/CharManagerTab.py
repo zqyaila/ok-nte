@@ -614,6 +614,7 @@ class CharManagerTab(CustomTab):
             task._ocr_lock = threading.Lock()
 
         old_ocr = task.ocr
+        old_chars = task.chars
 
         def locked_ocr(*args, **kwargs):
             with task._ocr_lock:
@@ -621,16 +622,18 @@ class CharManagerTab(CustomTab):
 
         task.ocr = locked_ocr
         task.chars = [test_char]
-        test_char.is_current_char = True
-        test_char.switch_next_char = lambda *args, **kwargs: None
+        try:
+            test_char.is_current_char = True
+            test_char.switch_next_char = lambda *args, **kwargs: None
 
-        if isinstance(test_char, CustomChar):
-            test_char.combo_str = self.combo_text.toPlainText().strip()
-            test_char._compile_combo()
+            if isinstance(test_char, CustomChar):
+                test_char.combo_str = self.combo_text.toPlainText().strip()
+                test_char._compile_combo()
 
-        test_char.perform()
-        task.chars = []
-        task.ocr = old_ocr
+            test_char.perform()
+        finally:
+            task.chars = old_chars
+            task.ocr = old_ocr
 
     def on_save_combo(self):
         combo_input = self.combo_select.currentText().strip()
