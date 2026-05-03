@@ -1,6 +1,5 @@
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from ok import Logger
@@ -16,7 +15,7 @@ class SoundCombatContext:
     _lock = threading.Lock()
     _combat_interrupt = threading.Event()
     _action_complete = threading.Event()
-    _last_trigger_time = 0.0
+    _sound_action_window = 1
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
@@ -32,19 +31,18 @@ class SoundCombatContext:
 
         self._listener: Optional[SoundListener] = None
         self._trigger: Optional[DodgeCounterTrigger] = None
-        self._thread_pool: Optional[ThreadPoolExecutor] = None
         self._context_lock = threading.RLock()
         self._is_active = False
         self._config = {}
         self._enable_sound_trigger = True
         self._pending_task = None
         self._pending_config = None
+        self._pending_action = None
 
     @classmethod
-    def enter_priority(cls):
+    def enter_priority(cls, on_timeout=None):
         cls._action_complete.clear()
         cls._combat_interrupt.set()
-        cls._last_trigger_time = time.time()
         logger.info("SoundCombatContext: Combat interrupt signal sent, main thread should pause")
 
         if not hasattr(cls, '_clear_seq'):
@@ -53,15 +51,16 @@ class SoundCombatContext:
         current_seq = cls._clear_seq
 
         def delayed_clear(seq):
-            time.sleep(0.8)
+            time.sleep(cls._sound_action_window)
+            discarded = False
+            if cls._clear_seq == seq and on_timeout is not None:
+                discarded = on_timeout()
+            if not discarded:
+                cls._action_complete.wait()
             if cls._clear_seq == seq:
                 cls._combat_interrupt.clear()
                 cls._action_complete.set()
         threading.Thread(target=delayed_clear, args=(current_seq,), daemon=True).start()
-
-    @classmethod
-    def is_in_sound_action_window(cls, window=1.5):
-        return time.time() - cls._last_trigger_time < window
 
     @classmethod
     def exit_priority(cls):
@@ -71,6 +70,13 @@ class SoundCombatContext:
     @classmethod
     def exit_priority_no_wait(cls):
         cls.exit_priority()
+
+    @classmethod
+    def clear_priority(cls):
+        if hasattr(cls, '_clear_seq'):
+            cls._clear_seq += 1
+        cls._combat_interrupt.clear()
+        cls._action_complete.set()
 
     @classmethod
     def should_interrupt_combat(cls):
@@ -131,10 +137,6 @@ class SoundCombatContext:
             self._listener.on_counter_triggered = self._on_counter_triggered
             self._listener.is_computation_required = self._is_computation_required
 
-            self._thread_pool = ThreadPoolExecutor(
-                max_workers=2, thread_name_prefix="SoundCombat"
-            )
-
             self._is_active = True
             logger.info("SoundCombatContext initialized")
 
@@ -159,40 +161,68 @@ class SoundCombatContext:
                 if self._listener:
                     self._listener.stop()
                     self._listener = None
-                if self._thread_pool:
-                    self._thread_pool.shutdown(wait=False, cancel_futures=True)
-                    self._thread_pool = None
+                self._pending_action = None
+                self.clear_priority()
                 self._trigger = None
                 self._is_active = False
                 logger.info("SoundCombatContext exited and completely cleared")
             except Exception as e:
                 logger.error(f"Error exiting SoundCombatContext: {e}")
 
+    def _queue_action(self, action):
+        with self._context_lock:
+            if self._trigger is None or self._trigger.task is None or self._trigger.task.paused:
+                return
+            if self.should_interrupt_combat():
+                return
+            if self._pending_action is not None:
+                return
+            self._pending_action = action
+
+        def discard_pending_action():
+            with self._context_lock:
+                if self._pending_action != action:
+                    return False
+                self._pending_action = None
+                logger.info(f"Sound action discarded after timeout: {action}")
+                return True
+
+        self.enter_priority(on_timeout=discard_pending_action)
+
     def _on_dodge_triggered(self):
-        if self._trigger is None or self._trigger.task is None or self._trigger.task.paused:
-            return
-        if self._thread_pool is None:
-            return
-        try:
-            self._thread_pool.submit(self._trigger.execute_dodge)
-        except Exception as e:
-            logger.error(f"Failed to submit dodge task: {e}")
+        self._queue_action("dodge")
 
     def _on_counter_triggered(self):
-        if self._trigger is None or self._trigger.task is None or self._trigger.task.paused:
+        self._queue_action("counter")
+
+    def execute_pending_action(self):
+        with self._context_lock:
+            action = self._pending_action
+            self._pending_action = None
+            trigger = self._trigger
+
+        if action is None or trigger is None or trigger.task is None or trigger.task.paused:
+            self.exit_priority()
             return
-        if self._thread_pool is None:
-            return
+
         try:
-            self._thread_pool.submit(self._trigger.execute_counter_attack)
+            if action == "dodge":
+                trigger.execute_dodge()
+            elif action == "counter":
+                trigger.execute_counter_attack()
         except Exception as e:
-            logger.error(f"Failed to submit counter task: {e}")
+            logger.error(f"Failed to execute sound action: {e}", exc_info=True)
+        finally:
+            self.exit_priority()
 
     def update_task(self, task):
         with self._context_lock:
             self._pending_task = task
             if self._trigger:
                 self._trigger.task = task
+            if task is None:
+                self._pending_action = None
+                self.clear_priority()
 
     def update_config(self, enable: bool, dodge_threshold: float, counter_threshold: float):
         with self._context_lock:
@@ -225,10 +255,6 @@ class SoundCombatContext:
     def trigger(self) -> Optional[DodgeCounterTrigger]:
         return self._trigger
 
-    @property
-    def thread_pool(self) -> Optional[ThreadPoolExecutor]:
-        return self._thread_pool
-
     def shutdown(self):
         with self._context_lock:
             if not self._is_active:
@@ -236,16 +262,13 @@ class SoundCombatContext:
 
             self.exit()
 
-            if self._thread_pool:
-                self._thread_pool.shutdown(wait=False, cancel_futures=True)
-                self._thread_pool = None
-
             self._listener = None
             self._trigger = None
             self._is_active = False
             self._config = {}
             self._pending_task = None
             self._pending_config = None
+            self._pending_action = None
             logger.info("SoundCombatContext shutdown complete")
 
     def __del__(self):

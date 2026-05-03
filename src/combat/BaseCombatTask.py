@@ -551,6 +551,7 @@ class BaseCombatTask(CombatCheck):
     def sleep_check(self):
         if SoundCombatContext.should_interrupt_combat():
             self.log_info("Combat sleep interrupted by sound action")
+            SoundCombatContext().execute_pending_action()
             SoundCombatContext.wait_for_resume()
 
         if self._in_combat:

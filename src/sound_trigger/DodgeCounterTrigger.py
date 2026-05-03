@@ -75,23 +75,15 @@ class DodgeCounterTrigger:
             self._is_executing = False
 
     def _default_dodge_action(self):
-        from src.sound_trigger.SoundCombatContext import SoundCombatContext
-        SoundCombatContext.enter_priority()
-        try:
-            logger.info("Dodge sequence: Left Shift")
-            self.task.send_key("shift")
-            time.sleep(0.5)
-            self.task.send_key("shift")
-            time.sleep(0.02)
-        finally:
-            SoundCombatContext.exit_priority()
+        logger.info("Dodge sequence: Left Shift")
+        self.task.send_key("shift")
+        time.sleep(0.02)
+        self.task.send_key("shift")
+        time.sleep(0.5)
 
     def _default_counter_action(self):
-        from src.sound_trigger.SoundCombatContext import SoundCombatContext
-        SoundCombatContext.enter_priority()
-        try:
-            logger.info("Counter attack sequence: Left mouse")
-            self.task.click()
-            time.sleep(0.02)
-        finally:
-            SoundCombatContext.exit_priority()
+        logger.info("Counter attack sequence: Left mouse")
+        self.task.click()
+        time.sleep(0.02)
+        self.task.click()
+        time.sleep(0.5)
