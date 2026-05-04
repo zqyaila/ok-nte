@@ -79,7 +79,7 @@ class BaseNTETask(BaseTask):
 
     @property
     def main_viewport(self):
-        return self.box_of_screen(0.1543, 0.1021, 0.9070, 0.6389, name="main_viewport")
+        return self.box_of_screen(0.1543, 0.1021, 0.9070, 0.7, name="main_viewport")
 
     # fmt: off
     @overload
@@ -239,33 +239,37 @@ class BaseNTETask(BaseTask):
         return cache["mat"], cache["mask"], cache["white_pixels"]
 
     def get_char_match_score(self, index):
-        """获取指定位置的匹配得分（基于像素覆盖率），分值越小越匹配"""
-        template_mat, template_mask, template_white_count = self._get_char_template_data()
+        """获取指定位置的匹配得分（基于模板匹配），分值越小越匹配"""
+        template_mat, _, template_white_count = self._get_char_template_data()
         if template_white_count == 0:
             return 1.0
 
         base_box = self.get_box_by_name(Labels.is_current_char)
-        if self.char_ui_offset:
-            base_box = self.shift_char_ui_box(base_box)
+        base_box = self.shift_char_ui_box(base_box, expend=True)
         box = self.get_box_by_char_spacing(base_box, index)
         # self.draw_boxes(boxes=box, color="blue")
 
         current_mat = gf.current_char_filter(box.crop_frame(self.frame), blur=True)
 
-        # 1. 掩码过滤并计算交集
-        if current_mat.shape == template_mask.shape:
-            current_mat = cv2.bitwise_and(current_mat, template_mask)
+        # 全白检测：过滤后近乎全白说明不是有效弧形，直接排除
+        total_pixels = current_mat.shape[0] * current_mat.shape[1]
+        if total_pixels > 0 and cv2.countNonZero(current_mat) / total_pixels > 0.5:
+            return 1.0
 
-            if current_mat.shape == template_mat.shape:
-                intersection = cv2.bitwise_and(current_mat, template_mat)
-                coverage = cv2.countNonZero(intersection) / template_white_count
-                return 1.0 - coverage
+        # 滑动覆盖率匹配（允许 current_mat 尺寸 >= template_mat）
+        # TM_CCORR 在二值图上 = 255*255 * 重叠白像素数，等价于原 bitwise_and 覆盖率但支持滑动
+        th, tw = template_mat.shape[:2]
+        ch, cw = current_mat.shape[:2]
+        if ch >= th and cw >= tw:
+            result = cv2.matchTemplate(current_mat, template_mat, cv2.TM_CCORR)
+            _, max_val, _, _ = cv2.minMaxLoc(result)
+            coverage = max_val / (template_white_count * 255 * 255)
+            return 1.0 - coverage
 
         return 1.0
 
     def is_char_at_index(self, index, threshold=0.3):
         """判断指定索引是否为当前角色"""
-        self.update_char_ui_offset()
         score = self.get_char_match_score(index)
         new = f"idx {index} conf {score:.3f}"
         if self.info_get("current char") != new:
