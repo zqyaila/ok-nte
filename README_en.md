@@ -34,7 +34,7 @@ All issues and consequences arising from the use of this software are not relate
 ## ✨ Main Features
 
 <p align="center">
-  <img src="assets/demo_en.gif" width="950" alt="demo">
+  <img width="950" alt="demo_en" src="https://github.com/user-attachments/assets/30aabf6c-4b19-46b7-b835-7bcd9298f966" />
 </p>
 
 - **Background Operation**: Automate game actions while in the background.
