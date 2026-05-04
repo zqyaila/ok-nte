@@ -176,7 +176,7 @@ class DailyTask(BaseNTETask):
         target = None
         box = self.get_box_by_name(Labels.box_f1_activity_reward)
         mask = iu.binarize_bgr_by_brightness(self.frame, threshold=245, to_bgr=False)
-        mask = iu.dilate_mask(mask, kernel_size=7, to_bgr=True)
+        mask = iu.morphology_mask(mask, kernel_size=7, to_bgr=True)
         reward_boxes = find_color_rectangles(
             mask, color_range=text_white_color, min_width=10, min_height=10, box=box, threshold=0.6
         )
