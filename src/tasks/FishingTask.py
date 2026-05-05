@@ -93,7 +93,7 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         self.log_info(f"自动钓鱼结束，成功 {success_count}/{rounds}", notify=True)
 
     def run_once(self, round_index: int) -> bool:
-        self.clear_success_overlay_if_present()
+        self.close_success_overlay()
 
         if not self.cast_rod():
             raise TaskDisabledException("未检测到进入抛竿状态")
@@ -110,7 +110,7 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         if self.is_fish_start_exist() or self.is_success_overlay():
             self.log_info("已在钓鱼准备界面")
             return True
-        
+
         if self.wait_until(self.find_interac, time_out=ENTER_SCENE_TIMEOUT):
             box = self.box_of_screen(0.9094, 0.8278, 0.9746, 0.9104)
 
@@ -140,6 +140,7 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
             if self.is_success_overlay():
                 self.log_info("抛竿时检测到成功面板, 尝试关闭")
                 self.do_close_success_overlay()
+            self.sleep(0.1)
 
         self.log_info("执行抛竿操作")
         if not self.wait_until(
@@ -316,16 +317,22 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         return self.is_success_text_exist()
 
     def close_success_overlay(self):
+        if self.is_fish_start_exist():
+            self.log_info("已在可抛竿状态")
+            return True
         if self.wait_until(
             lambda: not self.is_success_overlay(),
             pre_action=self.do_close_success_overlay,
-            time_out=10,
+            post_action=lambda: self.sleep(0.1),
+            time_out=20,
         ):
             self.log_info("关闭成功面板")
         else:
             self.log_error("关闭成功面板超时")
             return False
-        if self.wait_until(self.is_fish_start_exist, time_out=5):
+        if self.wait_until(
+            self.is_fish_start_exist, post_action=lambda: self.sleep(0.1), time_out=5
+        ):
             self.log_info("进入可抛竿状态")
             self.sleep(0.5)
         else:
@@ -339,11 +346,6 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
             self.send_key("esc", interval=2)
         else:
             self.operate_click(0.12, 0.88, interval=2)
-
-    def clear_success_overlay_if_present(self):
-        if self.is_success_overlay():
-            self.log_info("检测到成功面板")
-            self.close_success_overlay()
 
     def reset_runtime_state(self):
         self._set_bar_key(None)
@@ -494,7 +496,7 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         self.sleep(0.25)
         # self.operate_click(0.9520, 0.8812) #拉满数量
         self.sleep(0.25)
-        self.operate_click(0.8715, 0.9542) #确认购买
+        self.operate_click(0.8715, 0.9542)  # 确认购买
         self.sleep(1)
         self.back_to_fishing_scene()
 
