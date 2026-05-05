@@ -849,7 +849,7 @@ class BaseNTETask(BaseTask):
             self.send_key("esc")
             self.sleep(0.5)
             logger.info("handle_claim_button found a claim reward")
-            return True
+        return True
 
     def has_claim(self):
         return not self.is_in_team() and self.find_all_claim()
