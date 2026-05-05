@@ -200,6 +200,7 @@ config = {
         ["src.tasks.trigger.AutoCombatTask", "AutoCombatTask"],
         ["src.tasks.trigger.SkipDialogTask", "SkipDialogTask"],
         ["src.tasks.trigger.FastTravelTask", "FastTravelTask"],
+        ["src.tasks.trigger.HeistTask", "HeistTask"],
     ],
     "custom_tabs": [
         ["src.ui.CharHubTab", "CharHubTab"]

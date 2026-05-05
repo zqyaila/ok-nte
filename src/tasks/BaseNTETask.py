@@ -11,8 +11,8 @@ import win32api
 import win32con
 import win32gui
 import win32process
-
 from ok import BaseTask, Box, CannotFindException, Logger, og, safe_get
+
 from src.Labels import Labels
 from src.scene.NTEScene import NTEScene
 from src.scene.ScreenPosition import ScreenPosition
@@ -64,6 +64,20 @@ class BaseNTETask(BaseTask):
         if og.my_app is None:
             return None
         return og.my_app.get_thread_pool_executor()
+
+    def submit_periodic_task(self, delay, task, *args, **kwargs):
+        """
+        提交一个循环任务到线程池。
+        如果要停止循环，任务函数应返回 False。
+
+        :param task: 要执行的函数
+        :param delay: 每次执行后的间隔时间（秒）
+        :param args: 位置参数
+        :param kwargs: 关键字参数
+        """
+        if og.my_app is None:
+            return
+        og.my_app.submit_periodic_task(delay, task, *args, **kwargs)
 
     def _openvino_detect(self, frame, sync, box, threshold, force=False):
         if og.my_app is None:
@@ -456,8 +470,19 @@ class BaseNTETask(BaseTask):
         og.device_manager.set_interaction(m)
         self.log_info(f"已切换交互式方式: {get_name(m)}")
 
-    def bring_to_front(self):
+    def is_foreground(self):
+        """
+        检查窗口是否在最前端。
+        """
         if not self.hwnd:
+            return False
+        return self.hwnd.is_foreground()
+
+    def bring_to_front(self):
+        """
+        强制将窗口带到最前端。
+        """
+        if self.is_foreground():
             return
 
         hwnd = self.hwnd.hwnd
