@@ -695,7 +695,8 @@ class BaseNTETask(BaseTask):
             # ):
             #     self.log_debug(f"found agree {agree}")
             #     if self.find_boxes(
-            #         texts, boundary=self.box_of_screen(0.3, 0.3, 0.7, 0.7), match=re.compile("隐私")
+            #         texts, boundary=self.box_of_screen(0.3, 0.3, 0.7, 0.7),
+            #         match=re.compile(r"\d{11}"),
             #     ):
             #         self.click(agree, after_sleep=1)
             #         self.log_info("点击同意按钮!")
