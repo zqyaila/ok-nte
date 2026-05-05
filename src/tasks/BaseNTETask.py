@@ -11,8 +11,8 @@ import win32api
 import win32con
 import win32gui
 import win32process
-from ok import BaseTask, Box, CannotFindException, Logger, og, safe_get
 
+from ok import BaseTask, Box, CannotFindException, Logger, og, safe_get
 from src.Labels import Labels
 from src.scene.NTEScene import NTEScene
 from src.scene.ScreenPosition import ScreenPosition
@@ -20,7 +20,7 @@ from src.utils import game_filters as gf
 from src.utils import image_utils as iu
 
 logger = Logger.get_logger(__name__)
-stamina_re = re.compile(r"(\d+)\s*[/\\|!Il／-]\s*240")
+stamina_re = re.compile(r"(\d+)[\s/\\|!Il／-]+240")
 
 
 class BaseNTETask(BaseTask):
