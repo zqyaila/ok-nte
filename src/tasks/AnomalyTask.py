@@ -172,11 +172,12 @@ class AnomalyTask(NTEOneTimeTask, BaseCombatTask):
         for i in range(double_count + single_count):
             double = i < double_count
             self.do_combat_and_claim(double)
-            self.sleep(0.1)
+            self.sleep(2)
             if i < double_count + single_count - 1:
                 self.operate_click(0.621, 0.864)
         self.operate_click(0.381, 0.861)
         self.log_info("任务执行完毕")
+        return True
 
     def do_combat_and_claim(self, double: bool):
         self.log_info("开始执行战斗流程")
