@@ -1,4 +1,4 @@
-from ok import TaskDisabledException
+from ok import TaskDisabledException, og
 from qfluentwidgets import FluentIcon
 
 from src.combat.BaseCombatTask import BaseCombatTask
@@ -74,7 +74,7 @@ class AnomalyTask(NTEOneTimeTask, BaseCombatTask):
                 },
             }
         )
-        fmt = "选择列表中的第几个项目 ({}-{})"
+        fmt = og.app.tr("选择列表中的第几个项目 ({}-{})")
         instance.config_description.update(
             {
                 cls.CONF_TASK_TYPE: "选择要进行的任务类型",
