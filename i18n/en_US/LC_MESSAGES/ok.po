@@ -490,3 +490,9 @@ msgstr "Trigger Auto-Clicking Synchronously"
 
 msgid "触发连点的按键"
 msgstr "Auto-Clicking Key"
+
+msgid "自动补饵卖鱼"
+msgstr "Auto-Refill Bait & Sell Fish"
+
+msgid "首次抛竿失败时，补充默认鱼饵并出售鱼获"
+msgstr "Refill default bait and sell fish catch when the first cast fails"

@@ -490,3 +490,9 @@ msgstr "La activación de clics automáticos surtirá efecto simultáneamente"
 
 msgid "触发连点的按键"
 msgstr "Tecla de clics automáticos"
+
+msgid "自动补饵卖鱼"
+msgstr "Auto-recarga cebo y vende pescado"
+
+msgid "首次抛竿失败时，补充默认鱼饵并出售鱼获"
+msgstr "Recarga el cebo predeterminado y vende la captura cuando el primer lanzamiento falle"
