@@ -38,7 +38,6 @@ class AnomalyTask(NTEOneTimeTask, BaseCombatTask):
         self.name = "异象界域"
         self.description = "自动进行异象界域任务"
         self.icon = FluentIcon.FLAG
-        self.support_schedule_task = True
         self._outer_config = None
         self.setup_config(self)
 

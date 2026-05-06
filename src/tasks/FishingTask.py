@@ -27,7 +27,6 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         self.name = "自动钓鱼"
         self.description = "自动完成一轮或多轮钓鱼"
         self.icon = FluentIcon.SYNC
-        self.support_schedule_task = True
         self.default_config.update(
             {
                 self.CONF_ROUNDS: 1,
