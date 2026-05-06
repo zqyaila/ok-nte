@@ -82,8 +82,12 @@ class HeistTask(BaseNTETask, TriggerTask):
             self._scroll_time = time.time()
             self._scroll_switch = not self._scroll_switch
 
+    def _is_onetime_task_running(self):
+        if self.executor.current_task in self.executor.onetime_tasks:
+            return self.executor.current_task.running
+
     def _spam_key_loop(self):
-        if not self.enabled:
+        if not self.enabled or self._is_onetime_task_running():
             self._submitted = False
             return False
 

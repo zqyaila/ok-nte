@@ -1,5 +1,7 @@
+import contextvars
 import ctypes
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -11,8 +13,8 @@ import win32api
 import win32con
 import win32gui
 import win32process
-from ok import BaseTask, Box, CannotFindException, Logger, og, safe_get
 
+from ok import BaseTask, Box, CannotFindException, Logger, og, safe_get
 from src.Labels import Labels
 from src.scene.NTEScene import NTEScene
 from src.scene.ScreenPosition import ScreenPosition
@@ -20,11 +22,12 @@ from src.utils import game_filters as gf
 from src.utils import image_utils as iu
 
 logger = Logger.get_logger(__name__)
-stamina_re = re.compile(r"(\d+)[\s/\\|!Il／-]+240")
+stamina_re = re.compile(r"(\d+)[\s/\\|!Il／-]+\d+")
 
 
 class BaseNTETask(BaseTask):
     DEFAULT_MOVE = False
+    _current_move = contextvars.ContextVar("current_move", default=None)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -37,6 +40,8 @@ class BaseNTETask(BaseTask):
         self.default_box = ScreenPosition(self)
         self.char_ui_offset = False
         self.next_monthly_card_start = 0
+        self._last_interval_action_time = {}
+        self._action_interval_lock = threading.Lock()
 
     def sync_config(self, config=None):
         """同步并保存配置"""
@@ -121,35 +126,69 @@ class BaseNTETask(BaseTask):
     @overload
     def click(self, x: int | Box | List[Box] = -1, y=-1, move_back=False, name=None, interval=-1,
               move=False, down_time=0.02, after_sleep=0, key='left', hcenter=False,
-              vcenter=False) -> Any:
+              vcenter=False, action_name=None) -> Any:
         ...
     # fmt: on
 
-    def click(self, *args, **kwargs):
-        is_top_level = not hasattr(self, "_current_move")
+    def click(self, *args, action_name=None, **kwargs):
+        if action_name is not None:
+            interval = kwargs.get("interval", 0.1)
+            if not self.check_action_interval(action_name, interval):
+                return False
+            kwargs["interval"] = -1
 
-        if is_top_level:
-            self._current_move = kwargs.get("move", self.DEFAULT_MOVE)
-        kwargs["move"] = self._current_move
+        current_move = self._current_move.get()
+        token = None
+
+        if current_move is None:
+            token = self._current_move.set(kwargs.get("move", self.DEFAULT_MOVE))
+            current_move = self._current_move.get()
+        kwargs["move"] = current_move
 
         try:
             return super().click(*args, **kwargs)
         finally:
-            if is_top_level:
-                delattr(self, "_current_move")
+            if token is not None:
+                self._current_move.reset(token)
 
     # fmt: off
     @overload
     def operate_click(self, x: int | Box | List[Box] = -1, y=-1, move_back=False, name=None,
-                      interval=-1, down_time=0.02, key='left',
-                      hcenter=False, vcenter=False) -> Any:
+                       interval=-1, down_time=0.02, key='left',
+                       hcenter=False, vcenter=False, action_name=None) -> Any:
         ...
     # fmt: on
 
     def operate_click(self, *args, **kwargs):
         kwargs["move"] = True
         kwargs["after_sleep"] = 0
-        self.operate(lambda: self.click(*args, **kwargs), block=True)
+        return self.operate(lambda: self.click(*args, **kwargs), block=True)
+
+    # fmt: off
+    @overload
+    def send_key(self, key, down_time=0.02, interval=-1, after_sleep=0, action_name=None) -> Any:
+        ...
+    # fmt: on
+
+    def send_key(self, *args, action_name=None, **kwargs):
+        if action_name is not None:
+            interval = kwargs.get("interval", 0.1)
+            if not self.check_action_interval(action_name, interval):
+                return False
+            kwargs["interval"] = -1
+        return super().send_key(*args, **kwargs)
+
+    def check_action_interval(self, action_name: str, interval: float) -> bool:
+        if interval <= 0:
+            return True
+        # action_name must be a stable identifier, not a dynamic value.
+        with self._action_interval_lock:
+            now = time.time()
+            last_time = self._last_interval_action_time.get(action_name, 0)
+            if now - last_time < interval:
+                return False
+            self._last_interval_action_time[action_name] = now
+            return True
 
     def operate(self, func: Callable, block=False):
         from src.interaction.NTEInteraction import NTEInteraction
