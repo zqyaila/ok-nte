@@ -1,75 +1,76 @@
 import threading
 import time
+from collections import deque
 
 from qfluentwidgets import FluentIcon
 
+from ok import TaskDisabledException
 from src.tasks.BaseNTETask import BaseNTETask
 from src.tasks.NTEOneTimeTask import NTEOneTimeTask
-
 
 # ─────────────────────────── 常量 ───────────────────────────
 
 DETECT_POINTS = {
     "d": (0.2301, 0.7715),
-    "f": (0.4066, 0.7715),
-    "j": (0.5949, 0.7715),
-    "k": (0.7684, 0.7743),
+    "f": (0.4055, 0.7715),
+    "j": (0.5941, 0.7715),
+    "k": (0.7699, 0.7715),
 }
 
 # 亮度阈值：低于此值认为鼓点经过（背景≈245，鼓点≈28）
 BRIGHTNESS_THRESHOLD = 100
 
 # 结算界面
-FINISH_DETECT_BOX  = (0.20, 0.18, 0.80, 0.30)   # OCR检测"演奏结果"的区域
-FINISH_CLOSE_POS   = (0.5402, 0.0437)             # 结算界面×关闭按钮
+FINISH_CLOSE_POS = (0.5402, 0.0437)  # 结算界面×关闭按钮
 
 # 选歌界面
-SONG_SELECT_BOX    = (0.85, 0.90, 1.00, 1.00)    # OCR检测"开始演奏"的区域
-SONG_START_POS     = (0.8313, 0.9313)             # 开始演奏按钮（实测）
+SONG_START_POS = (0.8313, 0.9313)  # 开始演奏按钮（实测）
 
-FINISH_CHECK_INTERVAL = 2.0   # 结算检测间隔（秒），避免每帧跑OCR
+FINISH_CHECK_INTERVAL = 2.0  # 结算检测间隔（秒），避免每帧跑OCR
+DETECT_RADIUS_X = 5
+DETECT_RADIUS_Y = 10
+DARK_RATIO_THRESHOLD = 0.06
+RETRIGGER_INTERVAL = 0.085
+KEY_DOWN_TIME = 0.005
 
 
 class RhythmTask(NTEOneTimeTask, BaseNTETask):
+    CONF_TIMEOUT_SECONDS = "超时秒数"
+    CONF_DEBUG_LOG = "调试日志"
+    CONF_LOOP_COUNT = "循环次数"
+    CONF_TRACK_KEYS = "键位"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "自动音游"
-        self.description = "异环鼓组音游自动按键，支持自动结算和重打"
+        self.description = "异环鼓组音游自动打击与重试"
         self.icon = FluentIcon.MUSIC
-        self.default_config.update({
-            "启动延迟秒":   3,
-            "按键延迟ms":   0,
-            "超时秒数":     180,
-            "调试日志":     False,
-            "自动关闭结算": True,
-            "自动重打":     False,
-            "循环次数":     1,
-            "D列键位":      "d",
-            "F列键位":      "f",
-            "J列键位":      "j",
-            "K列键位":      "k",
-        })
-        self.config_description.update({
-            "启动延迟秒":   "点击启动后等待几秒再开始检测，留时间切换到游戏界面",
-            "按键延迟ms":   "检测到鼓点后的延迟（毫秒），有延迟时异步执行不阻塞检测",
-            "超时秒数":     "单首歌最长等待时间，超时后停止任务",
-            "调试日志":     "开启后每帧输出各点亮度，仅调试用",
-            "自动关闭结算": "歌曲结束后自动关闭结算界面",
-            "自动重打":     "关闭结算后自动点击开始演奏重新打歌，需同时开启自动关闭结算",
-            "循环次数":     "自动重打的总次数（包含第一次），0=无限循环",
-            "D列键位":      "第1列对应的键盘按键",
-            "F列键位":      "第2列对应的键盘按键",
-            "J列键位":      "第3列对应的键盘按键",
-            "K列键位":      "第4列对应的键盘按键",
-        })
+        self.default_config.update(
+            {
+                self.CONF_TIMEOUT_SECONDS: 180,
+                self.CONF_DEBUG_LOG: False,
+                self.CONF_LOOP_COUNT: 0,
+                self.CONF_TRACK_KEYS: "d, f, j, k",
+            }
+        )
+        self.config_description.update(
+            {
+                self.CONF_TIMEOUT_SECONDS: "单曲超时时间(秒)",
+                self.CONF_DEBUG_LOG: "输出调试日志",
+                self.CONF_LOOP_COUNT: "打歌次数, 0=无限循环",
+                self.CONF_TRACK_KEYS: "4列对应的键盘按键",
+            }
+        )
 
         self._prev_state: dict[str, bool] = {k: False for k in DETECT_POINTS}
-        self._last_finish_check: float    = 0.0
-        self._pending_keys: set           = set()
-        self._pending_lock                = threading.Lock()
-        self._px_cache: dict | None       = None
-        self._cache_shape: tuple | None   = None
+        self._last_press_time: dict[str, float] = {k: 0.0 for k in DETECT_POINTS}
+        self._last_finish_check: float = 0.0
+        self._key_queue: deque = deque()
+        self._key_queue_cv = threading.Condition()
+        self._key_worker: threading.Thread | None = None
+        self._key_worker_stop = False
+        self._px_cache: dict | None = None
+        self._cache_shape: tuple | None = None
 
     # =========================================================================
     # 入口
@@ -77,15 +78,18 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
 
     def run(self):
         super().run()
+        try:
+            return self.do_run()
+        except TaskDisabledException:
+            pass
+        except Exception as e:
+            self.log_error("RhythmTask error", e)
+            raise
 
-        delay = float(self.config.get("启动延迟秒", 3))
-        if delay > 0:
-            self.log_info(f"将在 {delay:.0f} 秒后开始检测，请切换到游戏界面")
-            self.sleep(delay)
-
-        total   = int(self.config.get("循环次数", 1))
-        endless = (total == 0)
-        count   = 0
+    def do_run(self):
+        total = int(self.config.get(self.CONF_LOOP_COUNT, 1))
+        endless = total == 0
+        count = 0
 
         while endless or count < total:
             count += 1
@@ -99,46 +103,39 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
             self.log_info("等待进入音游界面")
             deadline_load = time.time() + 15
             while time.time() < deadline_load:
-                self.next_frame()
                 self.sleep(0.3)
                 if not self._is_song_select():
                     break
             self.sleep(1.0)  # 额外等待界面稳定
 
             # 重置每曲状态
-            self._prev_state        = {k: False for k in DETECT_POINTS}
+            self._prev_state = {k: False for k in DETECT_POINTS}
+            self._last_press_time = {k: 0.0 for k in DETECT_POINTS}
             self._last_finish_check = 0.0
+            self._start_key_worker()
 
             # 单曲主循环
             self._run_single()
 
-            # 结算处理
-            if bool(self.config.get("自动关闭结算", True)):
-                self._handle_finish()
-            else:
-                break
+            self._handle_finish()
 
             # 是否继续
             if endless or count < total:
-                if bool(self.config.get("自动重打", False)):
-                    # 等待回到选歌界面后再点
-                    self.log_info("等待回到选歌界面")
-                    self.sleep(1.0)
-                    # 确认在选歌界面再点（防止界面未就绪）
-                    deadline = time.time() + 10
-                    while time.time() < deadline:
-                        if self._is_song_select():
-                            break
-                        self.next_frame()
-                        self.sleep(0.5)
-                else:
-                    break
+                # 等待回到选歌界面后再点
+                self.log_info("等待回到选歌界面")
+                self.sleep(1.0)
+                # 确认在选歌界面再点（防止界面未就绪）
+                deadline = time.time() + 10
+                while time.time() < deadline:
+                    if self._is_song_select():
+                        break
+                    self.sleep(0.5)
 
         self.log_info(f"自动音游任务结束，共完成 {count} 次", notify=True)
 
     def _run_single(self):
         """单曲打击主循环"""
-        timeout  = float(self.config.get("超时秒数", 180))
+        timeout = float(self.config.get(self.CONF_TIMEOUT_SECONDS, 180))
         deadline = time.time() + timeout
         self.log_info("音游开始，按键 D/F/J/K")
 
@@ -152,8 +149,11 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
                         return
                 self.tick()
                 self.next_frame()
+            else:
+                self.log_error(f"Song time out for {timeout}s, RhythmTask disabled")
+                raise TaskDisabledException()
         finally:
-            self._wait_pending()
+            self._stop_key_worker()
 
     # =========================================================================
     # 结算 & 重打
@@ -161,10 +161,12 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
 
     def _is_finished(self) -> bool:
         """检测是否出现结算界面（OCR 识别"演奏结果"）"""
-        return bool(self.ocr(
-            box=self.box_of_screen(*FINISH_DETECT_BOX),
-            match=["演奏结果"],
-        ))
+        yellow_box = self.box_of_screen(0.2211, 0.6625, 0.3156, 0.6965, name="finish_yellow")
+        red_box = self.box_of_screen(0.4555, 0.6625, 0.5445, 0.6965, name="finish_red")
+        yellow_pct = self.calculate_color_percentage(finish_yellow_color, yellow_box)
+        red_pct = self.calculate_color_percentage(finish_red_color, red_box)
+        # self.log_debug(f"_is_finished: yellow_pct {yellow_pct} red_pct {red_pct}")
+        return red_pct > 0.5 or yellow_pct > 0.5
 
     def _handle_finish(self):
         """关闭结算界面"""
@@ -173,65 +175,83 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
         self.click(FINISH_CLOSE_POS[0], FINISH_CLOSE_POS[1])
         self.sleep(1.0)
 
-
     def _is_song_select(self) -> bool:
         """检测当前是否在选歌界面（右下角有"开始演奏"按钮）"""
-        return bool(self.ocr(
-            box=self.box_of_screen(*SONG_SELECT_BOX),
-            match=["开始演奏"],
-        ))
+        pink_box = self.box_of_screen(0.7441, 0.8306, 0.9336, 0.8632, name="song_select_pink")
+        pink_pct = self.calculate_color_percentage(song_select_pink_color, pink_box)
+        # self.log_debug(f"_is_song_select: pink_pct {pink_pct}")
+        return pink_pct > 0.9
 
     # =========================================================================
     # 每帧逻辑
     # =========================================================================
 
     def tick(self):
-        state  = self.detect_notes()
-        delay  = float(self.config.get("按键延迟ms", 0)) / 1000.0
-        key_map = {
-            "d": str(self.config.get("D列键位", "d")).strip() or "d",
-            "f": str(self.config.get("F列键位", "f")).strip() or "f",
-            "j": str(self.config.get("J列键位", "j")).strip() or "j",
-            "k": str(self.config.get("K列键位", "k")).strip() or "k",
-        }
+        state = self.detect_notes()
+        key_map = self._get_key_map()
         col_name = {"d": "第1列", "f": "第2列", "j": "第3列", "k": "第4列"}
 
+        now = time.time()
         for track, has_note in state.items():
             prev = self._prev_state[track]
-            if has_note and not prev:
+            can_retrigger = (
+                has_note and prev and now - self._last_press_time[track] >= RETRIGGER_INTERVAL
+            )
+            if has_note and (not prev or can_retrigger):
                 actual_key = key_map[track]
-                if delay > 0:
-                    self._press_async(actual_key, delay, track, col_name[track])
-                else:
-                    self.send_key(actual_key, interval=0)
-                    self.log_info(f"按键 {actual_key.upper()} ({col_name[track]})")
+                self._queue_press(actual_key, col_name[track])
+                self._last_press_time[track] = now
             self._prev_state[track] = has_note
+
+    def _get_key_map(self) -> dict[str, str]:
+        raw_keys = str(self.config.get(self.CONF_TRACK_KEYS, "d, f, j, k"))
+        keys = [key.strip() for key in raw_keys.split(",")]
+        defaults = ["d", "f", "j", "k"]
+        keys = [(keys[i] if i < len(keys) and keys[i] else defaults[i]) for i in range(4)]
+        return dict(zip(DETECT_POINTS, keys))
 
     # =========================================================================
     # 异步按键
     # =========================================================================
 
-    def _press_async(self, key: str, delay: float, track: str, col: str = ""):
-        def _do():
-            time.sleep(delay)
-            self.send_key(key, interval=0)
-            self.log_info(f"按键 {key.upper()} ({col}) 延迟{delay*1000:.0f}ms")
-            with self._pending_lock:
-                self._pending_keys.discard(t)
+    def _start_key_worker(self):
+        if self._key_worker and self._key_worker.is_alive():
+            return
+        with self._key_queue_cv:
+            self._key_queue.clear()
+            self._key_worker_stop = False
+        self._key_worker = threading.Thread(target=self._key_worker_loop, daemon=True)
+        self._key_worker.start()
 
-        t = threading.Thread(target=_do, daemon=True)
-        with self._pending_lock:
-            self._pending_keys.add(t)
-        t.start()
+    def _stop_key_worker(self, timeout: float = 1.0):
+        with self._key_queue_cv:
+            self._key_worker_stop = True
+            self._key_queue.clear()
+            self._key_queue_cv.notify_all()
+        if self._key_worker:
+            self._key_worker.join(timeout=timeout)
+            if not self._key_worker.is_alive():
+                self._key_worker = None
 
-    def _wait_pending(self, timeout: float = 0.5):
-        with self._pending_lock:
-            threads = list(self._pending_keys)
-        for t in threads:
-            t.join(timeout=timeout)
+    def _queue_press(self, key: str, col: str = ""):
+        with self._key_queue_cv:
+            self._key_queue.append((key, col))
+            self._key_queue_cv.notify()
+
+    def _key_worker_loop(self):
+        while True:
+            with self._key_queue_cv:
+                while not self._key_queue and not self._key_worker_stop:
+                    self._key_queue_cv.wait(timeout=0.05)
+                if self._key_worker_stop and not self._key_queue:
+                    return
+                key, col = self._key_queue.popleft()
+
+            self.send_key(key, interval=0, down_time=KEY_DOWN_TIME)
+            self.log_info(f"按键 {key.upper()} ({col})")
 
     # =========================================================================
-    # 鼓点检测：单点亮度
+    # 鼓点检测：命中线附近窗口亮度
     # =========================================================================
 
     def detect_notes(self) -> dict[str, bool]:
@@ -241,21 +261,48 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
 
         fh, fw = frame.shape[:2]
         if self._cache_shape != (fh, fw):
-            self._px_cache    = {k: (int(x*fw), int(y*fh)) for k, (x, y) in DETECT_POINTS.items()}
+            self._px_cache = {k: (int(x * fw), int(y * fh)) for k, (x, y) in DETECT_POINTS.items()}
             self._cache_shape = (fh, fw)
 
-        debug       = bool(self.config.get("调试日志", False))
-        result      = {}
+        debug = bool(self.config.get(self.CONF_DEBUG_LOG, False))
+        result = {}
         debug_parts = [] if debug else None
 
         for key, (px, py) in self._px_cache.items():
-            brightness  = int(frame[py-1:py+2, px-1:px+2].mean())
-            has_note    = brightness < BRIGHTNESS_THRESHOLD
+            x1 = max(0, px - DETECT_RADIUS_X)
+            x2 = min(fw, px + DETECT_RADIUS_X + 1)
+            y1 = max(0, py - DETECT_RADIUS_Y)
+            y2 = min(fh, py + DETECT_RADIUS_Y + 1)
+            roi = frame[y1:y2, x1:x2]
+            dark_ratio = float((roi < BRIGHTNESS_THRESHOLD).mean())
+            brightness = int(roi.mean())
+            has_note = dark_ratio >= DARK_RATIO_THRESHOLD
             result[key] = has_note
             if debug:
-                debug_parts.append(f"{key.upper()}:{brightness}{'✓' if has_note else '✗'}")
+                debug_parts.append(
+                    f"{key.upper()}:{brightness}/{dark_ratio:.2f}{'✓' if has_note else '✗'}"
+                )
 
         if debug:
             self.log_info("检测 | " + " | ".join(debug_parts))
 
         return result
+
+
+finish_yellow_color = {
+    "r": (220, 230),
+    "g": (170, 180),
+    "b": (85, 90),
+}
+
+finish_red_color = {
+    "r": (220, 230),
+    "g": (90, 100),
+    "b": (85, 90),
+}
+
+song_select_pink_color = {
+    "r": (180, 220),
+    "g": (35, 50),
+    "b": (100, 120),
+}
