@@ -193,6 +193,7 @@ config = {
         # ["src.tasks.MyOneTimeWithAGroup", "MyOneTimeWithAGroup"],
         # ["src.tasks.MyOneTimeWithAGroup2", "MyOneTimeWithAGroup2"],
         # ["src.tasks.MyOneTimeWithBGroup", "MyOneTimeWithBGroup"],
+        ["src.tasks.RhythmTask", "RhythmTask"],  # 新增
         ["ok", "DiagnosisTask"],
         # ["src.tasks.custom.TeamScannerTask", "TeamScannerTask"],
         # ["src.tasks.DebugCharTask", "DebugCharTask"],
