@@ -62,8 +62,8 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
             }
         )
 
-        self._prev_state: dict[str, bool] = {k: False for k in DETECT_POINTS}
-        self._last_press_time: dict[str, float] = {k: 0.0 for k in DETECT_POINTS}
+        self._prev_state: dict[str, bool] = dict.fromkeys(DETECT_POINTS, False)
+        self._last_press_time: dict[str, float] = dict.fromkeys(DETECT_POINTS, 0.0)
         self._last_finish_check: float = 0.0
         self._key_queue: deque = deque()
         self._key_queue_cv = threading.Condition()
@@ -106,11 +106,14 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
                 self.sleep(0.3)
                 if not self._is_song_select():
                     break
+            else:
+                self.log_error("15 秒内未进入音游界面，停止任务")
+                raise TaskDisabledException()
             self.sleep(1.0)  # 额外等待界面稳定
 
             # 重置每曲状态
-            self._prev_state = {k: False for k in DETECT_POINTS}
-            self._last_press_time = {k: 0.0 for k in DETECT_POINTS}
+            self._prev_state = dict.fromkeys(DETECT_POINTS, False)
+            self._last_press_time = dict.fromkeys(DETECT_POINTS, 0.0)
             self._last_finish_check = 0.0
             self._start_key_worker()
 
@@ -130,6 +133,9 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
                     if self._is_song_select():
                         break
                     self.sleep(0.5)
+                else:
+                    self.log_error("10 秒内未返回选歌界面，停止任务")
+                    raise TaskDisabledException()
 
         self.log_info(f"自动音游任务结束，共完成 {count} 次", notify=True)
 
@@ -149,9 +155,8 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
                         return
                 self.tick()
                 self.next_frame()
-            else:
-                self.log_error(f"Song time out for {timeout}s, RhythmTask disabled")
-                raise TaskDisabledException()
+            self.log_error(f"Song time out for {timeout}s, RhythmTask disabled")
+            raise TaskDisabledException()
         finally:
             self._stop_key_worker()
 
@@ -257,7 +262,7 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
     def detect_notes(self) -> dict[str, bool]:
         frame = self.frame
         if frame is None:
-            return {k: False for k in DETECT_POINTS}
+            return dict.fromkeys(DETECT_POINTS, False)
 
         fh, fw = frame.shape[:2]
         if self._cache_shape != (fh, fw):
@@ -274,8 +279,9 @@ class RhythmTask(NTEOneTimeTask, BaseNTETask):
             y1 = max(0, py - DETECT_RADIUS_Y)
             y2 = min(fh, py + DETECT_RADIUS_Y + 1)
             roi = frame[y1:y2, x1:x2]
-            dark_ratio = float((roi < BRIGHTNESS_THRESHOLD).mean())
-            brightness = int(roi.mean())
+            pixel_brightness = roi.mean(axis=2) if roi.ndim == 3 else roi
+            dark_ratio = float((pixel_brightness < BRIGHTNESS_THRESHOLD).mean())
+            brightness = int(pixel_brightness.mean())
             has_note = dark_ratio >= DARK_RATIO_THRESHOLD
             result[key] = has_note
             if debug:
