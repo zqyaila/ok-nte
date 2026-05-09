@@ -363,7 +363,7 @@ class BaseCombatTask(CombatCheck):
             free_intro (bool, optional): 是否强制认为拥有入场技 (通常在协奏值满时)。默认为 False。
         """
         if self.team_size <= 1:
-            self.click(interval=0.1)
+            self.click(action_name="switch_char", interval=0.1)
             return
 
         current_char.wait_switch_cd()
@@ -415,7 +415,7 @@ class BaseCombatTask(CombatCheck):
             is_char_switched = self.is_char_at_index(switch_to.index)
 
             if not is_char_switched:
-                self.click(interval=0.2)
+                self.click(action_name="switch_char", interval=0.1)
                 self.sleep(0.001)
             else:
                 self.in_ultimate = False

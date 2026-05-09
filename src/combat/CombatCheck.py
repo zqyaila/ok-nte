@@ -28,6 +28,7 @@ class CombatSettle:
 class CombatCheck(BaseNTETask):
     # TARGET_MATCH_SCALES = (0.6, 0.7, 0.8, 0.9, 1.0)
     _LV_NORM_SIZE = 32
+    _TARGET_MASK_REGIONS = [(0.020, 0.017, 0.145, 0.240)]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -392,7 +393,7 @@ class CombatCheck(BaseNTETask):
 
             @cache
             def has_target():
-                return self.openvino_detect_async()
+                return self.openvino_detect_async(mask_regions=self._TARGET_MASK_REGIONS)
 
             @cache
             def has_lv():
@@ -488,7 +489,9 @@ class CombatCheck(BaseNTETask):
     def combat_detect(self, frame=None, target=True, lv=True):
         if lv and self.find_lv(frame=frame):
             return True
-        if target and self.openvino_detect_sync():
+        if target and self.openvino_detect_sync(
+            frame=frame, mask_regions=self._TARGET_MASK_REGIONS
+        ):
             return True
         return False
 
@@ -528,7 +531,9 @@ class CombatCheck(BaseNTETask):
         is_lv_false = not lv or lv_ret is False
 
         if target and (exhaustive or is_lv_false):
-            target_ret = self.openvino_detect_async(frame=frame, force=force)
+            target_ret = self.openvino_detect_async(
+                frame=frame, force=force, mask_regions=self._TARGET_MASK_REGIONS
+            )
             if target_ret:
                 return True
 

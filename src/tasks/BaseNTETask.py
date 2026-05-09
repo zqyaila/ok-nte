@@ -84,7 +84,7 @@ class BaseNTETask(BaseTask):
             return
         og.my_app.submit_periodic_task(delay, task, *args, **kwargs)
 
-    def _openvino_detect(self, frame, sync, box, threshold, force=False):
+    def _openvino_detect(self, frame, sync, box, threshold, force=False, mask_regions=None):
         if og.my_app is None:
             return []
         if box is None:
@@ -93,24 +93,34 @@ class BaseNTETask(BaseTask):
         if frame is None:
             frame = self.frame
         if sync:
-            results = og.my_app.openvino_detect_sync(image=frame, box=box, threshold=threshold)
+            results = og.my_app.openvino_detect_sync(
+                image=frame, box=box, threshold=threshold, mask_regions=mask_regions
+            )
         else:
             results = og.my_app.openvino_detect_async(
-                image=frame, box=box, threshold=threshold, force=force
+                image=frame,
+                box=box,
+                threshold=threshold,
+                force=force,
+                mask_regions=mask_regions,
             )
         if results:
             self.draw_boxes(boxes=results, color="red")
         return results
 
     def openvino_detect_async(
-        self, frame=None, box: Box = None, threshold=0.5, force=False
+        self, frame=None, box: Box = None, threshold=0.6, force=False, mask_regions=None
     ) -> List[Box]:
         """异步检测，返回结果可能为缓存值"""
-        return self._openvino_detect(frame, False, box, threshold, force=force)
+        return self._openvino_detect(
+            frame, False, box, threshold, force=force, mask_regions=mask_regions
+        )
 
-    def openvino_detect_sync(self, frame=None, box: Box = None, threshold=0.5) -> List[Box]:
+    def openvino_detect_sync(
+        self, frame=None, box: Box = None, threshold=0.5, mask_regions=None
+    ) -> List[Box]:
         """同步检测，会等待结果返回"""
-        return self._openvino_detect(frame, True, box, threshold)
+        return self._openvino_detect(frame, True, box, threshold, mask_regions=mask_regions)
 
     def openvino_clear_cache(self):
         """清空缓存"""
