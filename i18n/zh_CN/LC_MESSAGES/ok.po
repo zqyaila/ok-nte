@@ -478,7 +478,7 @@ msgstr ""
 msgid "触发连点将同步生效"
 msgstr ""
 
-msgid "触发连点的按键"
+msgid "触发连点的按键 (按住生效)"
 msgstr ""
 
 msgid "自动补饵卖鱼"

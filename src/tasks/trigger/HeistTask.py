@@ -60,7 +60,7 @@ class HeistTask(BaseNTETask, TriggerTask):
         )
         self.config_description.update(
             {
-                self.CONF_TRIGGER_KEY: "触发连点的按键",
+                self.CONF_TRIGGER_KEY: "触发连点的按键 (按住生效)",
                 self.CONF_USE_SCROLL: "触发连点将同步生效",
                 self.CONF_QUICK_RUN: "按住Shift生效",
                 self.CONF_QUICK_RUN_CHAR_COUNT: "切换角色数量",

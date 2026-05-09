@@ -488,8 +488,8 @@ msgstr "Trigger Key"
 msgid "触发连点将同步生效"
 msgstr "Trigger Auto-Clicking Synchronously"
 
-msgid "触发连点的按键"
-msgstr "Auto-Clicking Key"
+msgid "触发连点的按键 (按住生效)"
+msgstr "Auto-Clicking Key (Active while held)"
 
 msgid "自动补饵卖鱼"
 msgstr "Auto-Refill Bait & Sell Fish"
