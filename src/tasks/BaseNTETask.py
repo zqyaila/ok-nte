@@ -256,7 +256,7 @@ class BaseNTETask(BaseTask):
 
         if self.scene is not None:
             state, timestamp = self.scene.get_is_in_team_record()
-            if state and (to_sleep := 0.2 - (time.time() - timestamp)) > 0:
+            if state and (to_sleep := 0.5 - (time.time() - timestamp)) > 0:
                 self.sleep(to_sleep)
 
         arr = self.update_char_ui_offset()
