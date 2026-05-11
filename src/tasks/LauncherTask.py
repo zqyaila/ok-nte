@@ -20,7 +20,7 @@ GAME_CAPTURE_CONFIG = {
     "windows": {
         "exe": GAME_EXE,
         "hwnd_class": "UnrealWindow",
-        "interaction": [NTEInteraction],
+        "interaction": NTEInteraction,
         "capture_method": [
             "WGC",
             "BitBlt_RenderFull",

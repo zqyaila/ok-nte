@@ -818,8 +818,11 @@ class BaseNTETask(BaseTask):
                 return False
 
     def find_treasure(self):
+        def mask(img):
+            return iu.mask_corners(img, 0.5, 0.5, "all", to_bgr=False)
         return self.find_one(
-            Labels.treasure, box=self.main_viewport, threshold=0.5, use_gray_scale=True
+            Labels.treasure, box=self.main_viewport, threshold=0.7, mask_function=mask,
+            use_gray_scale=True
         )
 
     def walk_to_treasure(self):

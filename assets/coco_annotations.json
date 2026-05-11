@@ -44,7 +44,7 @@
         },
         {
             "id": 8,
-            "file_name": "images/2.png",
+            "file_name": "images/1.png",
             "width": 2560,
             "height": 1440
         },
@@ -62,7 +62,7 @@
         },
         {
             "id": 11,
-            "file_name": "images/1.png",
+            "file_name": "images/2.png",
             "width": 2560,
             "height": 1440
         },
@@ -104,7 +104,7 @@
         },
         {
             "id": 18,
-            "file_name": "images/2.png",
+            "file_name": "images/1.png",
             "width": 2560,
             "height": 1440
         },
@@ -621,12 +621,12 @@
             "image_id": 16,
             "category_id": 39,
             "bbox": [
-                899,
-                666,
-                29,
-                19
+                890,
+                652,
+                47,
+                47
             ],
-            "area": 551,
+            "area": 2209,
             "iscrowd": 0
         },
         {
