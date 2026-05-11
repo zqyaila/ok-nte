@@ -521,5 +521,14 @@ msgstr "Timeout (s)"
 msgid "输出调试日志"
 msgstr "Output debug logs"
 
+msgid "记录新特征"
+msgstr "Record New Feature"
+
+msgid "输入或选择绑定的{combo} (可选)"
+msgstr "Enter or select the bound {combo} (optional)"
+
+msgid "输入或选择关联的角色名称"
+msgstr "Enter or select the associated character name"
+
 msgid "键位"
 msgstr "Keys"
