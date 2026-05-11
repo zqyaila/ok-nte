@@ -20,12 +20,12 @@ GAME_CAPTURE_CONFIG = {
     "windows": {
         "exe": GAME_EXE,
         "hwnd_class": "UnrealWindow",
+        "interaction": [NTEInteraction],
+        "capture_method": [
+            "WGC",
+            "BitBlt_RenderFull",
+        ],
     },
-    "interaction": [NTEInteraction],
-    "capture_method": [
-        "WGC",
-        "BitBlt_RenderFull",
-    ],
 }
 LAUNCHER_CAPTURE_CONFIG = {
     "windows": {
@@ -37,7 +37,7 @@ LAUNCHER_CAPTURE_CONFIG = {
             "WGC",
             "BitBlt_RenderFull",
         ],
-    }
+    },
 }
 
 
@@ -143,10 +143,14 @@ class LauncherTask(BaseNTETask):
                 )
             except AttributeError as e:
                 self.log_warning(
-                    f"Launcher frame was unavailable while finding Start Game button; "
-                    f"treating as success: {e}"
+                    f"Launcher frame was unavailable while finding Start Game button {e}"
                 )
-                return True
+                if self._is_launcher_minimized():
+                    self.log_info("treating as success")
+                    return True
+                else:
+                    self.sleep(1)
+                    continue
             if start_button:
                 self.log_info(f"Found launcher Start Game button: {start_button}")
                 self.click(start_button, after_sleep=2)
@@ -189,10 +193,8 @@ class LauncherTask(BaseNTETask):
             raise TaskDisabledException("Timed out waiting for game process")
         self.log_info("Game process found; switching capture to game")
         self._capture_game()
-
         if not self._wait_for_foreground_to_settle(time_out=10):
             self.log_warning("Game window did not stay in foreground after launch")
-        self.sleep(1)
 
     def _wait_for_foreground_to_settle(self, time_out=8, settle_time=1):
         self.log_info(
@@ -222,7 +224,7 @@ class LauncherTask(BaseNTETask):
                     f"timeout_remain={deadline - now:.1f}s"
                 )
                 last_log_time = now
-            self.sleep(0.5)
+            time.sleep(1)
 
         return False
 

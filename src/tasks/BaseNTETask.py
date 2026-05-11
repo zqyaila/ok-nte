@@ -533,6 +533,9 @@ class BaseNTETask(BaseTask):
         """
         强制将窗口带到最前端。
         """
+        if not self.hwnd:
+            self.log_warning("bring_to_front skipped: hwnd_window unavailable")
+            return False
         hwnd = self.hwnd.hwnd
 
         if self.is_foreground():
