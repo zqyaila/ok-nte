@@ -8,6 +8,7 @@ import win32gui
 import win32process
 from qfluentwidgets import FluentIcon
 
+from Labels import Labels
 from interaction.NTEInteraction import NTEInteraction
 from ok import TaskDisabledException, BaseTask
 from ok.util.process import execute
@@ -20,18 +21,23 @@ GAME_CAPTURE_CONFIG = {
         "hwnd_class": "UnrealWindow",
     },
     "interaction": [
-        NTEInteraction,
-        "Pynput",
+        NTEInteraction
+    ],
+    "capture_method": [
+        "WGC",
+        "BitBlt_RenderFull",
     ],
 }
 LAUNCHER_CAPTURE_CONFIG = {
     "windows": {
         "exe": LAUNCHER_EXE,
-        "hwnd_class": None,
         "interaction": "PostMessage",
+        "capture_method": [
+            "WGC",
+            "BitBlt_RenderFull",
+        ],
     }
 }
-START_GAME_RE = re.compile(r"start\s*game|开始游戏|進入遊戲|进入游戏", re.IGNORECASE)
 
 
 class LauncherTask(BaseTask):
@@ -49,7 +55,6 @@ class LauncherTask(BaseTask):
         self.visible = True  # False to hide from the UI
 
     def run(self):
-        self._ensure_task_enabled()
         self.log_info("Launcher task started")
         game_proc = self._find_process(GAME_EXE)
         self.log_info(f"Game process check: {self._format_process(game_proc)}")
@@ -69,7 +74,8 @@ class LauncherTask(BaseTask):
             if not self._wait_for_process(LAUNCHER_EXE):
                 raise TaskDisabledException("Timed out waiting for launcher window")
             self._capture_launcher()
-            self._click_start_game()
+            if not self._click_start_game():
+                raise TaskDisabledException("Timed out waiting for launcher to minimize")
             self._wait_for_game_and_capture()
             return
 
@@ -95,7 +101,8 @@ class LauncherTask(BaseTask):
         if launcher_proc:
             self._update_launcher_path(launcher_proc.get("exe"))
         self._capture_launcher()
-        self._click_start_game()
+        if not self._click_start_game():
+            raise TaskDisabledException("Timed out waiting for launcher to minimize")
         self._wait_for_game_and_capture()
 
     def _capture_game(self):
@@ -110,11 +117,6 @@ class LauncherTask(BaseTask):
         self._log_task_state("after launcher ensure_capture")
         self.log_info("Launcher capture is ready; activating launcher window")
 
-    def _ensure_task_enabled(self):
-        if not self._enabled:
-            self.log_warning("Launcher task was not marked enabled at run start; enabling it now")
-            self._enabled = True
-
     def _log_task_state(self, point):
         current_task = getattr(self.executor, "current_task", None)
         self.log_info(
@@ -128,38 +130,50 @@ class LauncherTask(BaseTask):
         )
 
     def _click_start_game(self, time_out=120):
-        self.log_info(f"Looking for Start Game button with OCR for up to {time_out}s")
+        self.log_info(f"Looking for launcher Start Game button for up to {time_out}s")
         start = time.time()
         last_log_time = 0
         clicked_start_game = False
         while time.time() - start < time_out:
-            if clicked_start_game and self._find_process(GAME_EXE):
-                self.log_info("Game process appeared before clicking Start Game")
+            if self._is_launcher_minimized():
+                self.log_info("Launcher window is minimized; Start Game click succeeded")
                 return True
 
-            self._log_task_state("before launcher OCR")
-            texts = self.ocr(log=self.debug)
-            self._log_task_state("after launcher OCR")
-            start_buttons = self.find_boxes(texts, match=START_GAME_RE)
-            if start_buttons:
-                if clicked_start_game:
-                    self.log_info("Start Game button is still visible; clicking it again")
-                self.click(start_buttons[0], after_sleep=2)
+            start_button = self.find_one(
+                Labels.launcher_start_game,
+                horizontal_variance=0.1,
+                vertical_variance=0.1,
+            )
+            if start_button:
+                self.log_info(f"Found launcher Start Game button: {start_button}")
+                self.click(start_button, after_sleep=2)
                 clicked_start_game = True
-                self.log_info(f"Clicked Start Game button: {start_buttons[0].name}")
+                if self._is_launcher_minimized():
+                    self.log_info("Launcher minimized after Start Game click")
+                    return True
+                self.log_info("Launcher is not minimized after click; will check and click again if needed")
                 continue
 
             if clicked_start_game:
-                self.log_info("Start Game button disappeared; begin waiting for game process")
+                self.log_info(
+                    "Launcher Start Game button disappeared; treating click as successful"
+                )
                 return True
 
             now = time.time()
             if now - last_log_time >= 5:
-                self.log_info(f"Start Game button not found yet; OCR boxes={len(texts)}")
+                self.log_info("Launcher Start Game button not found yet")
                 last_log_time = now
             self.sleep(1)
-        self.log_warning("Start Game button was not found; continuing to wait for game process")
+        self.log_warning("Launcher did not minimize after Start Game attempts")
         return False
+
+    def _is_launcher_minimized(self):
+        launcher_proc = self._find_process(LAUNCHER_EXE)
+        if not launcher_proc:
+            return False
+        launcher_hwnd = self._find_window_for_process(launcher_proc)
+        return bool(launcher_hwnd and win32gui.IsIconic(launcher_hwnd))
 
     def _wait_for_game_and_capture(self, time_out=600):
         self.log_info(f"Waiting for game process for up to {time_out}s")
