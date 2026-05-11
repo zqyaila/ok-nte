@@ -523,3 +523,9 @@ msgstr "Output debug logs"
 
 msgid "键位"
 msgstr "Keys"
+
+msgid "Start Game"
+msgstr "Start Game"
+
+msgid "Launcher Path"
+msgstr "Launcher Path"
