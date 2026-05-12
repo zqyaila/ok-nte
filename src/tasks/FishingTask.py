@@ -606,8 +606,9 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         self.operate_click(0.556, 0.898)  # 一键出售
         self.sleep(1)
         self.operate_click(0.609, 0.656)  # 确认出售
-        self.sleep(1)
+        self.sleep(2)
         self.back_to_fishing_scene()
+        self.sleep(1)
 
     def buy_bait(self):
         self.click_default_bait()
@@ -617,8 +618,9 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         self.operate_click(0.8715, 0.9542)  # 购买
         self.sleep(1)
         self.operate_click(0.609, 0.661)  # 确认购买
-        self.sleep(1)
+        self.sleep(2)
         self.back_to_fishing_scene()
+        self.sleep(1)
 
     def back_to_fishing_scene(self):
         self.wait_until_pause_aware(
