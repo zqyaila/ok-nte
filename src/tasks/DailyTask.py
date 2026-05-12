@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Callable, List, Tuple
 
+from ok import CannotFindException, TaskDisabledException, find_color_rectangles
 from qfluentwidgets import FluentIcon
 
-from ok import CannotFindException, TaskDisabledException, find_color_rectangles
 from src import text_white_color
 from src.Labels import Labels
 from src.tasks.AnomalyTask import AnomalyTask
@@ -22,7 +22,7 @@ class DailyTask(NTEOneTimeTask, BaseNTETask):
     CONF_CLAIM_BP = "领取环期任务奖励"
 
     CONF_AUTO_CYCLE_SUB_TASK = "自动循环项目"
-    DAILY_STAMINA_TARGET = 180
+    DAILY_STAMINA_TARGET = "目标消耗体力"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -30,11 +30,12 @@ class DailyTask(NTEOneTimeTask, BaseNTETask):
         self.icon = FluentIcon.CAR
         self.support_schedule_task = True
         self.task_status = {"success": [], "failed": [], "skipped": [], "pending": []}
-        
+
         AnomalyTask.setup_config(self)
         self.default_config.update(
             {
                 self.CONF_AUTO_CYCLE_SUB_TASK: False,
+                self.DAILY_STAMINA_TARGET: 180,
             }
         )
         self.config_description.update(
@@ -148,11 +149,15 @@ class DailyTask(NTEOneTimeTask, BaseNTETask):
         Returns:
             bool: True 表示成功，False 表示失败
         """
+
+        def action():
+            self.openESCpanel()
+            self.operate_click(0.8707, 0.8736)
+            self.sleep(0.5)
+            return self.wait_panel(Labels.mail_panel)
+
         self.log_info("正在打开邮件面板")
-        self.openESCpanel()
-        self.operate_click(0.8707, 0.8736)
-        self.sleep(1)
-        result = self.wait_panel(Labels.mail_panel)
+        result = retry_on_action(action, self.ensure_main)
         if not result:
             self.log_error("无法找到邮件面板", notify=True)
             raise CannotFindException("can't find mail panel")
@@ -167,17 +172,19 @@ class DailyTask(NTEOneTimeTask, BaseNTETask):
         return True
 
     def complete_daily_activities(self):
-        """执行操作完成每日活跃度""" 
+        """执行操作完成每日活跃度"""
         self.log_info("正在执行每日活跃度任务")
         task: AnomalyTask = self.get_task_by_class(AnomalyTask)
-        ret = task.do_run(self.config, stamina_target=self.DAILY_STAMINA_TARGET)
+        ret = task.do_run(
+            self.config, stamina_target=self.config.get(self.DAILY_STAMINA_TARGET, 180)
+        )
         if ret:
             self.shift_idx(task)
         return ret
 
     def shift_idx(self, task):
         """切换任务索引"""
-        if self.config.get(self.CONF_AUTO_CYCLE_SUB_TASK):
+        if self.config and self.config.get(self.CONF_AUTO_CYCLE_SUB_TASK):
             if isinstance(task, AnomalyTask):
                 task_type = self.config.get(task.CONF_TASK_TYPE)
                 next_idx = task.get_next_sub_idx(self.config)
@@ -195,10 +202,16 @@ class DailyTask(NTEOneTimeTask, BaseNTETask):
 
     def claim_activity_rewards(self):
         """领取活跃度奖励"""
+
+        def action():
+            self.openF1panel()
+            self.operate_click(0.0551, 0.3833)
+            self.sleep(0.5)
+            return self.wait_panel(Labels.f1_activity_panel)
+
         self.log_info("正在领取活跃度奖励")
-        self.openF1panel()
-        self.operate_click(0.0551, 0.3833)
-        if not self.wait_panel(Labels.f1_activity_panel):
+        result = retry_on_action(action, self.ensure_main)
+        if not result:
             self.log_error("无法找到活跃度面板")
             return False
         if self.find_one(Labels.f1_activity_mission):
@@ -228,10 +241,16 @@ class DailyTask(NTEOneTimeTask, BaseNTETask):
 
     def claim_battle_pass_rewards(self):
         """领取环期任务奖励"""
+
+        def action():
+            self.openF2panel()
+            self.operate_click(0.0570, 0.3451)
+            self.sleep(0.5)
+            return self.wait_panel(Labels.f2_mission_panel)
+
         self.log_info("正在领取环期任务奖励")
-        self.openF2panel()
-        self.operate_click(0.0570, 0.3451)
-        if not self.wait_panel(Labels.f2_mission_panel):
+        result = retry_on_action(action, self.ensure_main)
+        if not result:
             self.log_error("无法找到环期任务面板")
             return False
         self.operate_click(0.8777, 0.8187)
@@ -241,3 +260,14 @@ class DailyTask(NTEOneTimeTask, BaseNTETask):
         self.operate_click(0.6934, 0.8229)
         self.sleep(1)
         return True
+
+
+def retry_on_action(action: Callable, reset_action: Callable | None = None, attempt=3):
+    result = None
+    count = 0
+    while not result and attempt <= attempt:
+        count += 1
+        result = action()
+        if not result and reset_action is not None:
+            reset_action()
+    return result

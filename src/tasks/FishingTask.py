@@ -89,6 +89,7 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         success_count = 0
         for index in range(rounds):
             self.log_info(f"开始第 {index + 1}/{rounds} 轮钓鱼")
+            self.info_set("轮次", f"{index + 1}/{rounds}")
             if self.run_once(index + 1):
                 success_count += 1
             else:
@@ -208,6 +209,9 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         self.log_info("等待鱼儿咬钩")
         if self.wait_until_pause_aware(
             self.is_fishing_bite,
+            post_action=lambda: self.close_success_overlay_once(
+                "抛竿时检测到成功面板, 尝试关闭"
+            ),
             time_out=20,
         ):
             self.log_info("鱼儿咬钩")
@@ -577,7 +581,7 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         return blue_pixels_ratio > 0.07
 
     def find_default_bait(self):
-        box = self.box_of_screen(0.0602, 0.2306, 0.313, 0.2597)
+        box = self.box_of_screen(0.1600, 0.2306, 0.313, 0.2597)
         image = box.crop_frame(self.frame)
         mask = iu.create_color_mask(image, default_bait_color, to_bgr=False)
         mask = iu.morphology_mask(mask, closing=True, to_bgr=False)
@@ -596,7 +600,7 @@ class FishingTask(NTEOneTimeTask, BaseNTETask):
         if box:
             self.operate_click(box)
             return
-        self.operate_click(0.0758, 0.2236)
+        self.operate_click(0.185, 0.243)
 
     def sell_fish(self):
         self.send_key("q")  # 背包
