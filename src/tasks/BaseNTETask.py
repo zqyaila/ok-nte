@@ -1,4 +1,3 @@
-import contextvars
 import ctypes
 import re
 import threading
@@ -27,7 +26,6 @@ stamina_re = re.compile(r"(\d+)[\s/\\|!Il／-]+\d+")
 
 class BaseNTETask(BaseTask):
     DEFAULT_MOVE = False
-    _current_move = contextvars.ContextVar("current_move", default=None)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -142,24 +140,14 @@ class BaseNTETask(BaseTask):
 
     def click(self, *args, action_name=None, **kwargs):
         if action_name is not None:
-            interval = kwargs.get("interval", 0.1)
+            interval = kwargs.get("interval", args[4] if len(args) > 4 else 0.1)
             if not self.check_action_interval(action_name, interval):
                 return False
             kwargs["interval"] = -1
 
-        current_move = self._current_move.get()
-        token = None
-
-        if current_move is None:
-            token = self._current_move.set(kwargs.get("move", self.DEFAULT_MOVE))
-            current_move = self._current_move.get()
-        kwargs["move"] = current_move
-
-        try:
-            return super().click(*args, **kwargs)
-        finally:
-            if token is not None:
-                self._current_move.reset(token)
+        if len(args) <= 5:
+            kwargs.setdefault("move", self.DEFAULT_MOVE)
+        return super().click(*args, **kwargs)
 
     # fmt: off
     @overload
