@@ -336,12 +336,13 @@ class BaseNTETask(BaseTask):
         box = self.get_box_by_char_spacing(base_box, index)
         # self.draw_boxes(boxes=box, color="blue")
 
-        current_mat = gf.current_char_filter(box.crop_frame(frame), blur=True)
+        current_mat = gf.current_char_filter(box.crop_frame(frame))
 
         # 全白检测：过滤后近乎全白说明不是有效弧形，直接排除
         total_pixels = current_mat.shape[0] * current_mat.shape[1]
         if total_pixels > 0 and cv2.countNonZero(current_mat) / total_pixels > 0.5:
             return 1.0
+        # iu.show_images([template_mat, current_mat], ["template", f"index_{index}"])
 
         # 滑动覆盖率匹配（允许 current_mat 尺寸 >= template_mat）
         # TM_CCORR 在二值图上 = 255*255 * 重叠白像素数，等价于原 bitwise_and 覆盖率但支持滑动
@@ -355,7 +356,7 @@ class BaseNTETask(BaseTask):
 
         return 1.0
 
-    def is_char_at_index(self, index, threshold=0.3, frame=None):
+    def is_char_at_index(self, index, threshold=0.5, frame=None):
         """判断指定索引是否为当前角色"""
         score = self.get_char_match_score(index, frame=frame)
         new = f"idx {index} conf {score:.3f}"
