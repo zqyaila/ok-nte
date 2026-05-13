@@ -12,7 +12,7 @@ class SoundTriggerTask(BaseNTETask, TriggerTask):
         self.default_config = {"_enabled": False}
         self.trigger_interval = 0.1
         self.name = "声音闪避反击"
-        self.description = "非战斗状态下, 响应声音闪避或反击"
+        self.description = "未处于自动战斗时, 响应声音闪避或反击"
         self._sound_trigger_allowed = False
         self._sound_config_enabled = True
 

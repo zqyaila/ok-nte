@@ -541,5 +541,5 @@ msgstr "Consumo de vigor alvo"
 msgid "声音闪避反击"
 msgstr "Esquiva e contra-ataque por som"
 
-msgid "非战斗状态下, 响应声音闪避或反击"
-msgstr "Fora de combate, responde a esquivas ou contra-ataques por som"
+msgid "未处于自动战斗时, 响应声音闪避或反击"
+msgstr "Quando o combate automático não está ativo, responde a esquivas ou contra-ataques por som"
