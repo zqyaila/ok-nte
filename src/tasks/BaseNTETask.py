@@ -957,6 +957,16 @@ class BaseNTETask(BaseTask):
                 current = int(match.group(1))
         self.info_set("当前体力", current)
         return current
+    
+    def retry_on_action(self, action: Callable, reset_action: Callable | None = None, attempt=3):
+        result = None
+        count = 0
+        while not result and count <= attempt:
+            count += 1
+            result = action()
+            if not result and reset_action is not None:
+                reset_action()
+        return result
 
 
 def interac_mask(image):
