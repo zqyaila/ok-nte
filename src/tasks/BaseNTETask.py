@@ -815,10 +815,8 @@ class BaseNTETask(BaseTask):
             #         self.log_info(f"点击开始游戏! {start}")
             #         return False
 
-            if app_version := self.find_boxes(
-                texts, match=re.compile(r"pp:[\d\.-]+", re.IGNORECASE)
-            ):
-                self.log_info(f"wait_login {app_version}")
+            if self.find_one(Labels.login_setting):
+                self.log_info("found login_setting, bring_to_front and click")
                 if not self.hwnd.is_foreground():
                     self.bring_to_front()
                     self.sleep(3)

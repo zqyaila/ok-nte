@@ -131,6 +131,12 @@
             "file_name": "images/4.png",
             "width": 2560,
             "height": 1440
+        },
+        {
+            "id": 23,
+            "file_name": "images/2.png",
+            "width": 2560,
+            "height": 1440
         }
     ],
     "annotations": [
@@ -718,6 +724,19 @@
             ],
             "area": 4224,
             "iscrowd": 0
+        },
+        {
+            "id": 46,
+            "image_id": 23,
+            "category_id": 47,
+            "bbox": [
+                2467,
+                36,
+                48,
+                49
+            ],
+            "area": 2352,
+            "iscrowd": 0
         }
     ],
     "categories": [
@@ -944,6 +963,11 @@
         {
             "id": 45,
             "name": "f5_panel",
+            "supercategory": ""
+        },
+        {
+            "id": 47,
+            "name": "login_setting",
             "supercategory": ""
         }
     ]
