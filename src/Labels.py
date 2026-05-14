@@ -25,6 +25,8 @@ class Labels(str, Enum):
     f1_panel = 'f1_panel'
     f2_mission_panel = 'f2_mission_panel'
     f2_panel = 'f2_panel'
+    f5_coffee_panel = 'f5_coffee_panel'
+    f5_panel = 'f5_panel'
     fish_bait = 'fish_bait'
     fish_start = 'fish_start'
     fising_sucess = 'fising_sucess'
