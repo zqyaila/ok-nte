@@ -133,6 +133,7 @@ class Hotori(BaseChar):
             lambda: not self.available("ultimate"),
             time_out=13,
             post_action=self.click_with_interval,
+            pre_action=lambda: self.sleep(0.01)
         )
         duration = time.time() - start - 0.1
         self.add_freeze_duration(start, duration)
